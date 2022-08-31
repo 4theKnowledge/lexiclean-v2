@@ -1,26 +1,25 @@
 const express = require("express");
-const _ = require("lodash");
 const router = express.Router();
-const logger = require("../../logger");
-const Map = require("../../models/Map");
-const Text = require("../../models/Text");
-const Token = require("../../models/Token");
-const Project = require("../../models/Project");
+const logger = require("../logger");
+const Resource = require("../models/Resource");
+const Text = require("../models/Text");
+const Token = require("../models/Token");
+const Project = require("../models/Project");
 
-const DEFAULT_COLOURS = { ua: "#ff7043", st: "#2196f3", en: "#eceff1" };
+const DEFAULT_COLORS = { ua: "#ff7043", st: "#2196f3", en: "#eceff1" };
 
 router.post("/", async (req, res) => {
   logger.info("Creating map", { route: "/api/map/" });
   try {
-    map = new Map({
-      project_id: req.body.project_id,
+    const map = new Resource({
+      projectId: req.body.projectId,
       type: req.body.type,
-      colour: req.body.colour,
+      color: req.body.color,
       active: true,
     });
 
     await Project.findByIdAndUpdate(
-      { _id: req.body.project_id },
+      { _id: req.body.projectId },
       { $push: { maps: map._id } },
       { upsert: true }
     );
@@ -36,7 +35,7 @@ router.post("/one/:projectId", async (req, res) => {
   // console.log(req.params, req.body);
   try {
     const response = await Map.findOne({
-      project_id: req.params.projectId,
+      projectId: req.params.projectId,
       type: req.body.type,
     });
     res.json(response);
@@ -49,10 +48,10 @@ router.post("/one/:projectId", async (req, res) => {
 router.post("/static/", async (req, res) => {
   // console.log("Adding static map");
 
-  const map = new Map({
+  const map = new Resource({
     type: req.body.type,
     tokens: req.body.tokens,
-    colour: req.body.colour,
+    color: req.body.color,
   });
 
   try {
@@ -70,7 +69,7 @@ router.post("/download", async (req, res) => {
     });
 
     // Get tokens
-    const tokens = await Token.find({ project_id: req.body.project_id }).lean();
+    const tokens = await Token.find({ projectId: req.body.projectId }).lean();
 
     if (req.body.mapName === "rp") {
       // Filter tokens for those with replacements
@@ -82,9 +81,7 @@ router.post("/download", async (req, res) => {
       }));
 
       // Get counts of replacements
-      const replacementsFreq = _.countBy(
-        replacementPairs.map((entry) => entry.token)
-      );
+      const replacementsFreq = {}; //_.countBy(replacementPairs.map((entry) => entry.token));
 
       // Filter out duplicate replacements
       let uniqueReplacementPairs = replacementPairs.filter(
@@ -125,7 +122,7 @@ router.post("/download", async (req, res) => {
     } else {
       // Filter tokens for those annotated with map
       const tokensMapped = tokens.filter(
-        (token) => token.meta_tags[req.body.mapName]
+        (token) => token.tags[req.body.mapName]
       );
       // console.log(tokensMapped);
 
@@ -155,7 +152,7 @@ router.post("/download", async (req, res) => {
 });
 
 router.get("/:projectId", async (req, res) => {
-  // Here additional classes and colours are defined. TODO: integrate into front-end so the user is aware of these decisions.
+  // Here additional classes and colors are defined. TODO: integrate into front-end so the user is aware of these decisions.
   logger.info("Fetching project maps", {
     route: `/api/map/${req.params.projectId}`,
   });
@@ -171,16 +168,16 @@ router.get("/:projectId", async (req, res) => {
     );
 
     const mapKeys = [...Object.keys(mapsRestructured), "ua", "st", "en"]; // ua - unassigned, st - suggested token, en - english word
-    let colourMap = Object.assign(
+    let colorMap = Object.assign(
       ...maps
         .filter((map) => map.active)
-        .map((map) => ({ [map.type]: map.colour }))
+        .map((map) => ({ [map.type]: map.color }))
     ); // Filters for active maps
-    colourMap = { ...colourMap, ...DEFAULT_COLOURS };
+    colorMap = { ...colorMap, ...DEFAULT_COLORS };
     res.json({
       contents: mapsRestructured,
       map_keys: mapKeys,
-      colour_map: colourMap,
+      color_map: colorMap,
     });
   } catch (err) {
     res.json({ message: err });
@@ -196,7 +193,7 @@ router.post("/status/:mapId", async (req, res) => {
     route: `/api/map/status/${req.params.mapId}`,
   });
   try {
-    const mapResponse = await Map.findByIdAndUpdate(
+    const mapResponse = await Resource.findByIdAndUpdate(
       { _id: req.params.mapId },
       { active: req.body.activeStatus }
     );

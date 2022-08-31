@@ -1,10 +1,256 @@
 const express = require("express");
 const router = express.Router();
-const logger = require("../../logger");
+const logger = require("../logger");
 const mongoose = require("mongoose");
-const Text = require("../../models/Text");
-const Token = require("../../models/Token");
-const Map = require("../../models/Map");
+const Text = require("../models/Text");
+const Token = require("../models/Token");
+const Resource = require("../models/Resource");
+
+router.post("/filter", async (req, res) => {
+  //
+  console.log("text filter body", req.body);
+
+  try {
+    // if (req.body.get_pages) {
+    // Returns total pages instead of page of results
+    // try {
+    //     logger.info("Getting number of pages for paginator (search filtered)", {
+    //       route: "/api/text/filter",
+    //     });
+
+    //     const filter = req.body.filter;
+
+    //     let textsCount;
+    //     if (filter.searchTerm !== "" || filter.saved !== "all") {
+    //       // Search is case-insensitive, non-exact matching
+    //       const tokenResponse = await Token.find({
+    //         projectId: req.body.projectId,
+    //         $or: [
+    //           { value: { $regex: filter.searchTerm, $options: "i" } },
+    //           { replacement: { $regex: filter.searchTerm, $options: "i" } },
+    //         ],
+    //       }).lean();
+
+    //       const tokenIds = new Set(tokenResponse.map((token) => token._id));
+
+    //       const textResponse = await Text.find({
+    //         projectId: req.body.projectId,
+    //         "tokens.token": { $in: Array.from(tokenIds) },
+    //       }).lean();
+
+    //       const textIds = new Set(textResponse.map((text) => text._id));
+
+    //       textsCount = await Text.find({
+    //         projectId: req.body.projectId,
+    //         _id: { $in: Array.from(textIds) },
+    //         saved:
+    //           filter.saved === "saved"
+    //             ? true
+    //             : filter.saved === "unsaved"
+    //             ? false
+    //             : { $in: [true, false] },
+    //       }).count();
+    //     } else {
+    //       textsCount = await Text.find({
+    //         projectId: req.body.projectId,
+    //       }).count();
+    //     }
+
+    //     const pages = Math.ceil(textsCount / req.query.limit);
+
+    //     res.json({ totalPages: pages });
+    //   } catch (err) {
+    //     res.json({ message: err });
+    //     logger.error("Failed to get number of pages for paginator", {
+    //       route: `/api/text/filter/pages/${req.params.projectId}`,
+    //     });
+    //   }
+    // } else {
+    //   logger.info("Fetching results from paginator", {
+    //     route: "/api/text/filter",
+    //   });
+
+    //   const skip = parseInt((req.query.page - 1) * req.query.limit); // equiv to page
+    //   const limit = parseInt(req.query.limit); // same as limit
+    //   const filter = req.body.filter;
+
+    //   let textIds;
+    //   if (filter.searchTerm !== "" || filter.candidates !== "all") {
+    //     // Case insensitive filter; filters for all tokens if no term specified
+    //     const tokenResponse = await Token.find({
+    //       projectId: req.body.projectId,
+    //       $or: [
+    //         { value: { $regex: filter.searchTerm, $options: "i" } },
+    //         { replacement: { $regex: filter.searchTerm, $options: "i" } },
+    //       ],
+    //     }).lean();
+
+    //     // OOV Candidate search
+    //     // These are tokens that are non-English, do not have a replacement or meta-tag
+    //     const candidateTokens = tokenResponse
+    //       .filter(
+    //         (token) =>
+    //           !token.tags["en"] &&
+    //           Object.keys(token.tags).length <= 1 &&
+    //           !token.replacement
+    //       )
+    //       .map((token) => token._id);
+    //     console.log("token candidates", candidateTokens);
+
+    //     const tokenIds = new Set(tokenResponse.map((token) => token._id));
+    //     const textResponse = await Text.find({
+    //       projectId: req.body.projectId,
+    //       "tokens.token": { $in: Array.from(tokenIds) },
+    //     }).lean();
+
+    //     textIds = new Set(textResponse.map((text) => text._id));
+    //   }
+
+    //   // Craft matchField to be subset based on texts filtered. If no
+    //   // filters applied then just grab all texts associated with the project
+    //   // If no search string is supplied, all _ids are returned.
+    //   const matchField = {
+    //     $match: {
+    //       projectId: mongoose.Types.ObjectId(req.body.projectId),
+    //       _id: filter.searchTerm
+    //         ? { $in: Array.from(textIds) }
+    //         : { $exists: true },
+    //       saved:
+    //         filter.saved === "saved"
+    //           ? true
+    //           : filter.saved === "unsaved"
+    //           ? false
+    //           : { $in: [true, false] },
+    //     },
+    //   };
+
+    //   const aggQuery = [
+    //     matchField,
+    //     {
+    //       $project: {
+    //         saved: "$saved",
+    //         rank: "$rank",
+    //         tokenIds: "$tokens.token",
+    //       },
+    //     },
+    //     {
+    //       $sort: { rank: 1 },
+    //     },
+    //     {
+    //       $skip: skip,
+    //     },
+    //     {
+    //       $limit: limit,
+    //     },
+    //   ];
+
+    //   const textAggregation = await Text.aggregate(aggQuery)
+    //     .allowDiskUse(true)
+    //     .exec();
+
+    //   // Prepare payload
+    //   const tokenIdsAgg = textAggregation.map((text) => text.tokenIds).flat();
+    //   const tokens = await Token.find({ _id: { $in: tokenIdsAgg } }).lean();
+
+    //   const payload = {
+    //     textTokenMap: textAggregation,
+    //     tokens: tokens,
+    //   };
+
+    //   res.json(payload);
+    // }
+
+    const skip = parseInt((req.query.page - 1) * req.query.limit); // equiv to page
+    const limit = parseInt(req.query.limit); // same as limit
+
+    const matchField = {
+      $match: {
+        projectId: mongoose.Types.ObjectId(req.body.projectId),
+      },
+    };
+
+    const aggQuery = [
+      matchField,
+      {
+        $lookup: {
+          from: "tokens",
+          localField: "tokens.token",
+          foreignField: "_id",
+          as: "tokens",
+        },
+      },
+      {
+        $project: {
+          weight: "$weight",
+          rank: "$rank",
+          saved: "$saved",
+          identifiers: "$identifiers",
+          tokens: "$tokens",
+          original: "$original",
+          reference: "$reference",
+        },
+      },
+      {
+        $sort: { rank: 1 },
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+    ];
+    const textAggregation = await Text.aggregate(aggQuery)
+      .allowDiskUse(true)
+      .exec();
+
+    // Turn texts and tokens into hashmaps (text uses _id, tokens use tokens index)
+    const payload = Object.assign(
+      {},
+      ...textAggregation.map((text) => ({
+        [text._id]: {
+          weight: text.weight,
+          rank: text.rank,
+          saved: text.saved,
+          identifiers: text.identifiers,
+          original: text.original,
+          reference: text.reference,
+          tokens: Object.assign(
+            {},
+            ...text.tokens.map((token) => ({
+              [token.index]: {
+                _id: token._id,
+                value: token.value,
+                currentValue: token.replacement // Adds current value of token based on state of token. This can be updated in reducers at scale/
+                  ? token.replacement
+                  : token.suggestion
+                  ? token.suggestion
+                  : token.value,
+                tags: token.tags,
+                replacement: token.replacement,
+                suggestion: token.suggestion,
+              },
+            }))
+          ),
+        },
+      }))
+    );
+
+    // Get count of documents on project
+    const textCount = await Text.count({
+      projectId: req.body.projectId,
+    }).lean();
+
+    console.log("textCount", textCount);
+
+    res.status(200).send({ texts: payload, totalTexts: textCount });
+  } catch (error) {
+    logger.error("Failed to get text pagination results", {
+      route: `/api/text/filter/${req.body.projectId}`,
+    });
+    res.status(500).send({ detail: error });
+  }
+});
 
 router.get("/:textId", async (req, res) => {
   try {
@@ -30,167 +276,6 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/filter", async (req, res) => {
-  //
-  console.log("text filter body", req.body);
-
-  try {
-    if (req.body.get_pages) {
-      // Returns total pages instead of page of results
-      try {
-        logger.info("Getting number of pages for paginator (search filtered)", {
-          route: "/api/text/filter",
-        });
-
-        const filter = req.body.filter;
-
-        let textsCount;
-        if (filter.searchTerm !== "" || filter.annotated !== "all") {
-          // Search is case-insensitive, non-exact matching
-          const tokenResponse = await Token.find({
-            project_id: req.body.project_id,
-            $or: [
-              { value: { $regex: filter.searchTerm, $options: "i" } },
-              { replacement: { $regex: filter.searchTerm, $options: "i" } },
-            ],
-          }).lean();
-
-          const tokenIds = new Set(tokenResponse.map((token) => token._id));
-
-          const textResponse = await Text.find({
-            project_id: req.body.project_id,
-            "tokens.token": { $in: Array.from(tokenIds) },
-          }).lean();
-
-          const textIds = new Set(textResponse.map((text) => text._id));
-
-          textsCount = await Text.find({
-            project_id: req.body.project_id,
-            _id: { $in: Array.from(textIds) },
-            annotated:
-              filter.annotated === "annotated"
-                ? true
-                : filter.annotated === "unannotated"
-                ? false
-                : { $in: [true, false] },
-          }).count();
-        } else {
-          textsCount = await Text.find({
-            project_id: req.body.project_id,
-          }).count();
-        }
-
-        const pages = Math.ceil(textsCount / req.query.limit);
-
-        res.json({ totalPages: pages });
-      } catch (err) {
-        res.json({ message: err });
-        logger.error("Failed to get number of pages for paginator", {
-          route: `/api/text/filter/pages/${req.params.projectId}`,
-        });
-      }
-    } else {
-      logger.info("Fetching results from paginator", {
-        route: "/api/text/filter",
-      });
-
-      const skip = parseInt((req.query.page - 1) * req.query.limit); // equiv to page
-      const limit = parseInt(req.query.limit); // same as limit
-      const filter = req.body.filter;
-
-      let textIds;
-      if (filter.searchTerm !== "" || filter.candidates !== "all") {
-        // Case insensitive filter; filters for all tokens if no term specified
-        const tokenResponse = await Token.find({
-          project_id: req.body.project_id,
-          $or: [
-            { value: { $regex: filter.searchTerm, $options: "i" } },
-            { replacement: { $regex: filter.searchTerm, $options: "i" } },
-          ],
-        }).lean();
-
-        // OOV Candidate search
-        // These are tokens that are non-English, do not have a replacement or meta-tag
-        const candidateTokens = tokenResponse
-          .filter(
-            (token) =>
-              !token.meta_tags["en"] &&
-              Object.keys(token.meta_tags).length <= 1 &&
-              !token.replacement
-          )
-          .map((token) => token._id);
-        console.log("token candidates", candidateTokens);
-
-        const tokenIds = new Set(tokenResponse.map((token) => token._id));
-        const textResponse = await Text.find({
-          project_id: req.body.project_id,
-          "tokens.token": { $in: Array.from(tokenIds) },
-        }).lean();
-
-        textIds = new Set(textResponse.map((text) => text._id));
-      }
-
-      // Craft matchField to be subset based on texts filtered. If no
-      // filters applied then just grab all texts associated with the project
-      // If no search string is supplied, all _ids are returned.
-      const matchField = {
-        $match: {
-          project_id: mongoose.Types.ObjectId(req.body.project_id),
-          _id: filter.searchTerm
-            ? { $in: Array.from(textIds) }
-            : { $exists: true },
-          annotated:
-            filter.annotated === "annotated"
-              ? true
-              : filter.annotated === "unannotated"
-              ? false
-              : { $in: [true, false] },
-        },
-      };
-
-      const aggQuery = [
-        matchField,
-        {
-          $project: {
-            annotated: "$annotated",
-            rank: "$rank",
-            token_ids: "$tokens.token",
-          },
-        },
-        {
-          $sort: { rank: 1 },
-        },
-        {
-          $skip: skip,
-        },
-        {
-          $limit: limit,
-        },
-      ];
-
-      const textAggregation = await Text.aggregate(aggQuery)
-        .allowDiskUse(true)
-        .exec();
-
-      // Prepare payload
-      const tokenIdsAgg = textAggregation.map((text) => text.token_ids).flat();
-      const tokens = await Token.find({ _id: { $in: tokenIdsAgg } }).lean();
-
-      const payload = {
-        textTokenMap: textAggregation,
-        tokens: tokens,
-      };
-
-      res.json(payload);
-    }
-  } catch (err) {
-    res.json({ message: err });
-    logger.error("Failed to get text pagination results", {
-      route: `/api/text/filter/${req.body.project_id}`,
-    });
-  }
-});
-
 router.get("/overview/:projectId", async (req, res) => {
   // Get candidate counts across all documents bucketed by their page number
   // This is used for effort estimation for users
@@ -202,7 +287,7 @@ router.get("/overview/:projectId", async (req, res) => {
     // Aggregation
     const textAggregation = await Text.aggregate([
       {
-        $match: { project_id: mongoose.Types.ObjectId(req.params.projectId) },
+        $match: { projectId: mongoose.Types.ObjectId(req.params.projectId) },
       },
       {
         $lookup: {
@@ -315,40 +400,40 @@ router.patch("/save/annotations", async (req, res) => {
 
     if (req.body.replacements_only) {
       const checkTextState = (text) => {
-        // Checks whether the tokens in a text have been annotated
-        // if so, the text will be marked as annotated
+        // Checks whether the tokens in a text have been saved
+        // if so, the text will be marked as saved
         const textHasCandidates =
           text.tokens.filter(
             (token) =>
-              token.token.meta_tags.length > 1 ||
+              token.token.tags.length > 1 ||
               token.token.replacement ||
-              token.token.suggested_replacement
+              token.token.suggestion
           ).length > 0;
         return textHasCandidates;
       };
 
-      const annotatedTextIds = textsRes
+      const savedTextIds = textsRes
         .filter((text) => checkTextState(text))
         .map((text) => text._id);
 
-      console.log(annotatedTextIds);
+      console.log(savedTextIds);
 
-      // Patch annotated field on texts
+      // Patch saved field on texts
       const testUpdateRes = await Text.updateMany(
-        { _id: { $in: annotatedTextIds } },
+        { _id: { $in: savedTextIds } },
         {
-          annotated: true,
+          saved: true,
           // last_modified: new Date(Date.now())
         }
       );
 
       res.json(testUpdateRes);
     } else {
-      // Previously only marked annotated texts as those that had a change made
+      // Previously only marked saved texts as those that had a change made
       const testUpdateRes = await Text.updateMany(
         { _id: { $in: req.body.textIds } },
         {
-          annotated: true,
+          saved: true,
           // last_modified: new Date(Date.now())
         }
       );
@@ -362,14 +447,34 @@ router.patch("/save/annotations", async (req, res) => {
   }
 });
 
+router.patch("/annotation/save", async (req, res) => {
+  // Updates the saved state of a single, or set of, textId(s)
+  try {
+    logger.info("Saving text(s)", {
+      route: `/api/text/annotation/save`,
+    });
+
+    await Text.updateMany(
+      {
+        _id: { $in: req.body.textIds },
+      },
+      { saved: req.body.saved }
+    );
+
+    res.status(200).send({ updated: true });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({ detail: error });
+  }
+});
+
 router.patch("/save/annotation/:textId", async (req, res) => {
   // Updates the annotation status of a given text
   try {
     await Text.updateOne(
       { _id: req.params.textId },
       {
-        annotated: req.body.value,
-        // last_modified: new Date(Date.now())
+        saved: req.body.value,
       }
     );
 
@@ -425,7 +530,7 @@ router.patch("/tokenize/:textId", async (req, res) => {
       .map((token) => token._id);
 
     // Create new tokens
-    const enMap = await Map.findOne({ type: "en" }).lean();
+    const enMap = await Resource.findOne({ type: "en" }).lean();
     const enMapSet = new Set(enMap.tokens);
 
     // Here all historical info will be stripped from new tokens; however they will
@@ -433,10 +538,10 @@ router.patch("/tokenize/:textId", async (req, res) => {
     const newTokenList = tokenValuesTC.map((token) => {
       return {
         value: token,
-        meta_tags: { en: enMapSet.has(token) },
+        tags: { en: enMapSet.has(token) },
         replacement: null,
-        suggested_replacement: null,
-        project_id: req.body.project_id,
+        suggestion: null,
+        projectId: req.body.projectId,
       };
     });
 
@@ -520,8 +625,8 @@ router.patch("/tokenize/:textId", async (req, res) => {
     const outputText = {
       ...updatedTextRes,
       tokens: outputTokens,
-      old_token_ids: tokenIdsTC,
-      new_token_ids: newTokenIds,
+      oldTokenIds: tokenIdsTC,
+      newTokenIds: newTokenIds,
     };
 
     res.json(outputText);
@@ -545,24 +650,24 @@ router.patch("/tokenize/:textId", async (req, res) => {
 // currently legacy code.
 router.patch("/tokenize/undo", async (req, res) => {
   try {
-    const textId = await Text.findById({ _id: req.body.text_id }).lean();
+    const textId = await Text.findById({ _id: req.body.textId }).lean();
 
     // Remove old tokens
     const oldTokenIds = textId.tokens.map((token) => token._id);
     await Token.deleteMany({ _id: { $in: oldTokenIds } });
 
     // Create new tokens
-    const enMap = await Map.findOne({ type: "en" }).lean();
+    const enMap = await Resource.findOne({ type: "en" }).lean();
     const enMapSet = new Set(enMap.tokens);
 
     // Here all historical info will be stripped from new tokens regardless of whether new combinations are in IV form
     const newTokenList = textId.original.split(" ").map((token) => {
       return {
         value: token,
-        meta_tags: { en: enMapSet.has(token) },
+        tags: { en: enMapSet.has(token) },
         replacement: null,
-        suggested_replacement: null,
-        project_id: textId.project_id,
+        suggestion: null,
+        projectId: textId.projectId,
       };
     });
 
@@ -577,7 +682,7 @@ router.patch("/tokenize/undo", async (req, res) => {
     };
 
     const updatedTextRes = await Text.findByIdAndUpdate(
-      { _id: req.body.text_id },
+      { _id: req.body.textId },
       tokensPayload,
       { new: true }
     )
@@ -617,17 +722,17 @@ router.patch("/split/:textId", async (req, res) => {
 
     const text = await Text.findById({ _id: req.params.textId }).lean();
     // console.log(text);
-    const project_id = text.project_id;
+    const projectId = text.projectId;
 
     // Get token index (this could be sent from UI, but easier on server)
     // Note: token.token is the token _id in the text's token array (each array element has the _id key)
     const tokenIndex = text.tokens.filter(
-      (token) => token.token == req.body.token_id
+      (token) => token.token == req.body.tokenId
     )[0].index;
     // console.log(tokenIndex);
 
     // Create new tokens...
-    const enMap = await Map.findOne({ type: "en" }).lean();
+    const enMap = await Resource.findOne({ type: "en" }).lean();
     const enMapSet = new Set(enMap.tokens);
 
     // Here all historical info will be stripped from new tokens; however they will
@@ -636,10 +741,10 @@ router.patch("/split/:textId", async (req, res) => {
       return {
         value: token,
         active: true,
-        meta_tags: { en: enMapSet.has(token) },
+        tags: { en: enMapSet.has(token) },
         replacement: null,
-        suggested_replacement: null,
-        project_id: project_id,
+        suggestion: null,
+        projectId: projectId,
       };
     });
 
@@ -650,10 +755,7 @@ router.patch("/split/:textId", async (req, res) => {
     // console.log(tokenListRes);
 
     // Deactivate old token...
-    await Token.findByIdAndUpdate(
-      { _id: req.body.token_id },
-      { active: false }
-    );
+    await Token.findByIdAndUpdate({ _id: req.body.tokenId }, { active: false });
 
     // update old and new token indexes
     const tokensToAdd = tokenListRes.map((token, index) => ({
@@ -688,7 +790,7 @@ router.patch("/split/:textId", async (req, res) => {
 
     res.json({
       new_tokens: tokenListRes,
-      token_ids: text.tokens.map((token) => token.token),
+      tokenIds: text.tokens.map((token) => token.token),
     }); // token.token is the token _id in the text tokens array...
   } catch (err) {
     res.json({ message: err });

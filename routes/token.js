@@ -24,14 +24,21 @@ router.patch("/add", async (req, res) => {
         { replacement: req.body.replacement }
       );
 
+      // Filter for only unsaved texts to ensure that saved documents are not modified
+      let unsavedTextIds = await Text.find(
+        { projectId: focusToken.projectId, saved: false },
+        { _id: 1 }
+      ).lean();
+      unsavedTextIds = unsavedTextIds.map((t) => t._id.toString());
+
       const tokenMatches = await Token.find({
         projectId: focusToken.projectId,
         value: focusToken.value,
         replacement: { $eq: null },
         _id: { $ne: req.body.tokenId },
+        textId: { $in: unsavedTextIds },
       }).lean();
 
-      console.log("matches", tokenMatches);
       console.log("Number of matches", tokenMatches.length);
 
       const updatedTokens = tokenMatches.map((token) => ({
