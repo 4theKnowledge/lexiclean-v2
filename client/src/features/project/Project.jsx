@@ -1,243 +1,127 @@
-import React, { useEffect } from "react";
-// import { Col, Container, Row, Spinner } from "react-bootstrap";
-import { useDispatch, useSelector } from "react-redux";
-import { useParams } from "react-router-dom";
-// import "./AnnotationTable.css";
-// import { ContextToast } from "./contexttoast";
-// import { Paginator } from "./paginator";
+import { useEffect, useContext } from "react";
+import { useParams, Link } from "react-router-dom";
 import {
-  fetchProject,
-  fetchProjectMaps,
-  selectBgColourMap,
-  selectProject,
-  fetchMetrics,
-  selectFilter,
-} from "./projectSlice";
-// import { Sidebar } from "./sidebar";
-import { Text } from "./text";
-// import { Tokenize } from "./tokenize";
-import {
-  getTotalPages,
-  selectPage,
-  selectPageLimit,
-  setPage,
-} from "./textSlice";
-import {
-  fetchTokens,
-  selectShowToast,
-  selectTextTokenMap,
-  selectTokenizeTextId,
-  setTokenizeTextId,
-  setIdle,
-  updateAllTokenDetails,
-  patchSingleAnnotationState,
-} from "./tokenSlice";
-
-import { Grid } from "@mui/material"
-
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import CloseIcon from '@mui/icons-material/Close';
-import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
-import SearchIcon from '@mui/icons-material/Search';
-import ModeEditIcon from '@mui/icons-material/ModeEdit';
+  Grid,
+  Typography,
+  CircularProgress,
+  IconButton,
+  Drawer,
+  Box,
+} from "@mui/material";
+import { grey } from "@mui/material/colors";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import { DrawerWidth } from "../../shared/constants/layout";
+import { ProjectContext } from "../../shared/context/project-context";
+import Sidebar from "./sidebar/Sidebar";
+import AnnotationTable from "./AnnotationTable";
+import Paginator from "./Paginator";
+import AnnotationToast from "./AnnotationToast";
 
 const Project = () => {
-  const dispatch = useDispatch();
+  const { projectId, pageNumber } = useParams();
+  const [state, dispatch] = useContext(ProjectContext);
 
-  const { projectId: activeProjectId } = useParams();
-  let { pageNumber } = useParams();
+  useEffect(() => {
+    dispatch({ type: "SET_PROJECTID", payload: projectId });
+  }, [projectId]);
 
-  const project = useSelector(selectProject);
-  const projectStatus = useSelector((state) => state.project.status);
-  const projectError = useSelector((state) => state.project.error);
-  const bgColourMap = useSelector(selectBgColourMap);
-  const showToast = useSelector(selectShowToast);
-  const filter = useSelector(selectFilter);
-
-  const pageLimit = useSelector(selectPageLimit);
-  const page = useSelector(selectPage);
-  const textsError = useSelector((state) => state.texts.error);
-  const tokenizeTextId = useSelector(selectTokenizeTextId);
-
-  const tokensStatus = useSelector((state) => state.tokens.status);
-  const tokensError = useSelector((state) => state.tokens.error);
-
-  const textTokenMap = useSelector(selectTextTokenMap);
-
-  // useEffect(() => {
-  //   // Updates texts whenever page is changed...
-  //   dispatch(setPage(pageNumber));
-  //   dispatch(setIdle());
-  // }, [pageNumber]);
-
-  // useEffect(() => {
-  //   // Loader for project information
-  //   if (activeProjectId && projectStatus === "idle") {
-  //     dispatch(fetchProject({ projectId: activeProjectId }));
-  //     dispatch(fetchProjectMaps({ projectId: activeProjectId }));
-  //   }
-  // }, [activeProjectId, projectStatus, dispatch]);
-
-  // useEffect(() => {
-  //   if (
-  //     activeProjectId &&
-  //     projectStatus === "succeeded" &&
-  //     tokensStatus === "idle"
-  //   ) {
-  //     // Fetches the count of total pages based on current settings
-  //     // and the tokens associated with the texts on the current page.
-  //     dispatch(
-  //       getTotalPages({
-  //         project_id: project._id,
-  //         get_pages: true,
-  //         filter: filter,
-  //         page_limit: pageLimit,
-  //       })
-  //     );
-  //     dispatch(
-  //       fetchTokens({
-  //         project_id: project._id,
-  //         filter: filter,
-  //         page_limit: pageLimit,
-  //         page: page,
-  //       })
-  //     );
-  //   }
-  //   if (tokensStatus === "succeeded") {
-  //     dispatch(
-  //       updateAllTokenDetails({
-  //         token_ids: textTokenMap.map((text) => text.token_ids).flat(),
-  //         bgColourMap: bgColourMap,
-  //       })
-  //     );
-  //   }
-  // }, [tokensStatus, projectStatus, dispatch]);
-
-  // let textsContent;
-  // if (tokensStatus === "loading") {
-  //   textsContent = <Spinner />;
-  // } else if (tokensStatus === "succeeded" && textTokenMap.length === 0) {
-  //   textsContent = (
-  //     <div
-  //       style={{
-  //         marginTop: "25vh",
-  //         textAlign: "center",
-  //         fontSize: "2rem",
-  //         fontWeight: "bold",
-  //         color: "#607d8b",
-  //       }}
-  //     >
-  //       <SearchIcon style={{ fontSize: "5rem", textAlign: "center" }} />
-  //       <p>Sorry, no results were found</p>
-  //     </div>
-  //   );
-  // } else if (tokensStatus === "succeeded") {
-  //   textsContent = (
-  //     <div>
-  //       <div className="annotation-table">
-  //         {textTokenMap &&
-  //           textTokenMap.map((text, id) => {
-  //             return (
-  //               <div
-  //                 id="container"
-  //                 tokenize={tokenizeTextId === text._id && "true"}
-  //                 waiting={
-  //                   tokenizeTextId !== text._id && tokenizeTextId && "true"
-  //                 }
-  //               >
-  //                 <div id="index-column" annotated={text.annotated && "true"}>
-  //                   <div id="icon">{id + 1 + (page - 1) * pageLimit}</div>
-  //                 </div>
-  //                 <div id="row" key={id} annotated={text.annotated && "true"}>
-  //                   <div id="text-column">
-  //                     {tokenizeTextId === text._id ? (
-  //                       <Tokenize tokenIds={text.token_ids} textId={text._id} />
-  //                     ) : (
-  //                       <Text tokenIds={text.token_ids} textId={text._id} />
-  //                     )}
-  //                   </div>
-  //                   <div id="actions">
-  //                     {text.annotated ? (
-  //                       <CheckCircleIcon
-  //                         id="icon"
-  //                         annotated="true"
-  //                         onClick={() => {
-  //                           dispatch(
-  //                             patchSingleAnnotationState({
-  //                               textId: text._id,
-  //                               value: false,
-  //                             })
-  //                           );
-  //                           dispatch(fetchMetrics({ projectId: project._id }));
-  //                         }}
-  //                       />
-  //                     ) : (
-  //                       <CloseIcon
-  //                         id="icon"
-  //                         onClick={() => {
-  //                           dispatch(
-  //                             patchSingleAnnotationState({
-  //                               textId: text._id,
-  //                               value: true,
-  //                             })
-  //                           );
-  //                           dispatch(fetchMetrics({ projectId: project._id }));
-  //                         }}
-  //                       />
-  //                     )}
-  //                     {tokenizeTextId === text._id ? (
-  //                       <MoreHorizIcon
-  //                         id="icon-tokenize"
-  //                         active="true"
-  //                         title="Go to replacement view"
-  //                         onClick={() => {
-  //                           dispatch(
-  //                             setTokenizeTextId(
-  //                               tokenizeTextId === text._id ? null : text._id
-  //                             )
-  //                           );
-  //                         }}
-  //                       />
-  //                     ) : (
-  //                       <ModeEditIcon
-  //                         id="icon-tokenize"
-  //                         title="Go to tokenization view"
-  //                         onClick={() => {
-  //                           dispatch(
-  //                             setTokenizeTextId(
-  //                               tokenizeTextId === text._id ? null : text._id
-  //                             )
-  //                           );
-  //                         }}
-  //                       />
-  //                     )}
-  //                   </div>
-  //                 </div>
-  //               </div>
-  //             );
-  //           })}
-  //       </div>
-  //       <Paginator />
-  //     </div>
-  //   );
-  // } else if (tokensStatus === "failed") {
-  //   textsContent = <div>{textsError}</div>;
-  // }
+  useEffect(() => {
+    dispatch({ type: "SET_VALUE", payload: { pageNumber: pageNumber } });
+  }, [pageNumber]);
 
   return (
-    // {/* {showToast && <ContextToast />} */ }
-    <Grid>
-      {/* <Sidebar /> */}
-      <Grid className="annotation-col">
-        {/* <>{textsContent}</> */}
-
-        {textTokenMap &&
-          textTokenMap.map((text, id) => {
-            return <Text tokenIds={text.token_ids} textId={text._id} />
-          })}
-
-      </Grid>
-    </Grid>
+    <Box sx={{ display: "flex" }}>
+      {state.showToast && <AnnotationToast />}
+      <Drawer
+        sx={{
+          width: DrawerWidth,
+          flexShrink: 0,
+          "& .MuiDrawer-paper": {
+            width: DrawerWidth,
+            boxSizing: "border-box",
+          },
+        }}
+        variant="permanent"
+        anchor="left"
+      >
+        {!state.projectLoading && <Sidebar />}
+      </Drawer>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          bgcolor: "grey",
+          p: 0,
+        }}
+      >
+        <Grid
+          item
+          container
+          xs={12}
+          direction="column"
+          justifyContent="space-evenly"
+        >
+          <Grid
+            item
+            container
+            p={2}
+            justifyContent="center"
+            alignItems="center"
+          >
+            <Grid item xs={1}>
+              <IconButton component={Link} to={`/projects`}>
+                <ArrowBackIcon />
+              </IconButton>
+            </Grid>
+            <Grid item xs={10} sx={{ textAlign: "left" }}>
+              {!state.projectLoading && (
+                <Typography variant="h4" title={state.project.name}>
+                  {!state.project.name.length > 35
+                    ? state.project.name.slice(0, 35) + "..."
+                    : state.project.name}
+                </Typography>
+              )}
+            </Grid>
+            <Grid
+              container
+              item
+              xs={1}
+              justifyContent="center"
+              alignItems="center"
+            >
+              {state.operationLoading && (
+                <CircularProgress size="1rem" disableShrink />
+              )}
+            </Grid>
+          </Grid>
+          <Grid
+            item
+            container
+            sx={{
+              overflowY: "auto",
+              height: "calc(100vh - 84px - 74px)",
+              "::-webkit-scrollbar": {
+                width: "10px",
+              },
+              "::-webkit-scrollbar-track": {
+                background: grey[300],
+              },
+              "::-webkit-scrollbar-thumb": {
+                background: grey[400],
+              },
+              "::-webkit-scrollbar-thumb:hover": {
+                background: grey[500],
+              },
+            }}
+          >
+            <AnnotationTable />
+          </Grid>
+          <Grid item container justifyContent="center" p={2}>
+            <Paginator />
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
   );
 };
 

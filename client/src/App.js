@@ -4,34 +4,27 @@ import { ThemeProvider } from "@mui/material";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./App.css";
 import { appTheme } from "./theme";
-import { AuthProvider } from "./features/auth/authcontext";
-import Login from "./features/auth/login";
-import SignUp from "./features/auth/Signup";
+// import { AuthProvider } from "./features/auth/authcontext";
 // import { ProtectedRoute } from "./features/auth/protectedroute";
 // import { Unauthorized } from "./features/auth/unauthorized";
-// import { Footer } from "./features/common/footer";
-// import NavBar from "./features/common/navbar";
+import Landing from "./features/landing/Landing";
 import Projects from "./features/projects/Projects";
-// import { PortalModal } from "./features/modals/modalportal";
-import Create from "./features/project/create/Create";
+import CreateProject from "./features/projectcreation/CreateProject";
 import Project from "./features/project/Project";
 import history from "./features/utils/history";
-
-import Landing from "./features/landing/Landing";
-import Layout from "./features/common/Layout";
-
-import Annotation from "./features/Annotation";
+import Layout from "./shared/components/Layout";
+// import Annotation from "./features/Annotation";
+import Dev from "./features/dev/Dev";
 
 function App() {
   // return (
   //   <Router history={history}>
   //     <AuthProvider>
   //       <Switch>
-  //         <ProtectedRoute path="/project/:projectId/page/:pageNumber">
+  //         <ProtectedRoute path="/project/:projectId/page=:pageNumber">
   //           <Helmet>
   //             <title>Annotation | LexiClean</title>
   //           </Helmet>
-  //           <NavBar />
   //           <Project />
   //           <Footer />
   //           <PortalModal />
@@ -41,7 +34,6 @@ function App() {
   //           <Helmet>
   //             <title>New Project | LexiClean</title>
   //           </Helmet>
-  //           <NavBar />
   //           <Create />
   //           <Footer />
   //         </ProtectedRoute>
@@ -50,7 +42,6 @@ function App() {
   //           <Helmet>
   //             <title>Project Feed | LexiClean</title>
   //           </Helmet>
-  //           <NavBar />
   //           <Feed />
   //           <Footer />
   //           <PortalModal />
@@ -85,26 +76,20 @@ function App() {
     <ThemeProvider theme={appTheme}>
       <BrowserRouter>
         <Routes>
+          <Route index element={<Landing />} />
+          <Route
+            path="/project/:projectId/page=:pageNumber"
+            element={<Project />}
+          />
+          {/* <Route path="/dev" element={<Dev />} /> */}
           <Route path="/" element={<Layout />}>
-            {/* <Route index element={<Landing />} /> */}
-            {/* <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} /> */}
-            <Route index element={<Projects />} />
-            {/* path="/projects" */}
-            <Route
-              path="/project/:projectId/page/:pageNumber"
-              element={<Annotation />}
-            />
-            <Route path="/project/new" element={<Create />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/project/new/:step" element={<CreateProject />} />
           </Route>
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
   );
 }
-
-const LandingTest = () => {
-  return <h1>hello</h1>;
-};
 
 export default App;

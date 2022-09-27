@@ -1,54 +1,98 @@
 import React, { useContext } from "react";
-import "../common/Footer.css";
-import history from "../utils/history";
-import { Grid, Button, Stack } from "@mui/material";
+// import history from "../utils/history";
+import {
+  AppBar,
+  Button,
+  Grid,
+  Toolbar,
+  IconButton,
+  Typography,
+  Chip,
+  Stack,
+} from "@mui/material";
 import StartIcon from "@mui/icons-material/Start";
+import LogoutIcon from "@mui/icons-material/Logout";
+import ArticleIcon from "@mui/icons-material/Article";
+import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
+import { useAuth0 } from "@auth0/auth0-react";
 
-import { selectIsAuthenticated } from "../auth/userSlice";
-import { useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+// import { selectIsAuthenticated } from "../auth/userSlice";
+import { useNavigate, Link } from "react-router-dom";
 
 const Landing = () => {
-  const isAuthenticated = useSelector(selectIsAuthenticated);
+  // const isAuthenticated = useSelector(selectIsAuthenticated);
   const navigate = useNavigate();
 
   return (
-    <Grid container>
-      <Grid item>
-        <Grid item id="row-signup">
-          <Stack>
-            <Button
-              variant="contained"
-              onClick={
-                isAuthenticated
-                  ? () => navigate("/feed")
-                  : () => navigate("/signup")
-              }
-            >
-              {isAuthenticated ? (
-                <>
-                  Enter <StartIcon />
-                </>
-              ) : (
-                "Sign Up"
-              )}
-            </Button>
-            {!isAuthenticated && (
-              <p
-                style={{
-                  textAlign: "right",
-                  marginRight: "0.5rem",
-                }}
-                onClick={() => navigate("/login")}
-              >
-                or <strong style={{ cursor: "pointer" }}>login</strong>
-              </p>
-            )}
-          </Stack>
+    <Grid
+      container
+      alignItems="center"
+      justifyContent="center"
+      style={{ zIndex: 999 }}
+    >
+      <Grid item xs={12} style={{ flexGrow: 1 }}>
+        <AppBar position="fixed" elevation={0} style={{ background: "none" }}>
+          <Toolbar style={{ display: "flex", justifyContent: "right" }}>
+            {/* {isAuthenticated && (
+              <IconButton onClick={logout} title="Click to logout">
+                <LogoutIcon color="secondary" id="information" />
+              </IconButton>
+            )} */}
+          </Toolbar>
+        </AppBar>
+      </Grid>
+      <Grid
+        container
+        item
+        justifyContent="center"
+        alignItems="center"
+        direction="column"
+        sx={{ textAlign: "center", height: "100vh", zIndex: 999 }}
+        spacing={2}
+      >
+        <Grid container item spacing={2}>
+          <Grid item xs={12}>
+            <Typography variant="h3" gutterBottom>
+              LexiClean
+            </Typography>
+          </Grid>
+          <Grid item xs={12}>
+            <Typography variant="h5" gutterBottom>
+              An annotation tool for rapid multi-task lexical normalisation
+            </Typography>
+          </Grid>
+        </Grid>
+        <Grid item>
+          <LoginButton />
         </Grid>
       </Grid>
     </Grid>
   );
+};
+
+const LoginButton = () => {
+  const { loginWithRedirect } = useAuth0();
+
+  const isAuthenticated = true;
+
+  if (isAuthenticated) {
+    return (
+      <Button
+        variant="contained"
+        component={Link}
+        to="/projects"
+        endIcon={<ArrowForwardIosIcon />}
+      >
+        Enter
+      </Button>
+    );
+  } else {
+    return (
+      <Button variant="contained" onClick={() => loginWithRedirect()}>
+        Log In or Sign up
+      </Button>
+    );
+  }
 };
 
 export default Landing;

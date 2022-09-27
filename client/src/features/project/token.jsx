@@ -1,176 +1,190 @@
-import React, { useEffect, useState } from "react";
-// import { OverlayTrigger } from "react-bootstrap";
-// import { useContextMenu } from "react-contexify";
-import { useDispatch, useSelector } from "react-redux";
-// import { ContextMenu } from "./contextmenu";
-// import { PopoverManager } from "./popovermanager";
-import { selectBgColourMap, selectProject } from "./projectSlice";
-import "./Token.css";
-import { selectTokenValues, updateCurrentValue } from "./tokenSlice";
+import { useState, useEffect, useContext } from "react";
+import { Typography, Stack, TextField, Popover } from "@mui/material";
+import { styled } from "@mui/material/styles";
+import { grey, blue, orange } from "@mui/material/colors";
+import EditPopover from "./EditPopover";
+import { alpha } from "@mui/material/styles";
+import { EditColor } from "../../shared/constants/project";
+import { ProjectContext } from "../../shared/context/project-context";
+import { getTokenWidth } from "../../shared/utils/token";
 
-export const Token = ({ tokenId, textId }) => {
-  const tokenValues = useSelector(selectTokenValues);
-  const token = tokenValues[tokenId];
-  const MENU_ID = `menu-${textId}-${token._id}`;
-  // const { show: showContextMenu } = useContextMenu({ id: MENU_ID });
+export const TokenInputComponent = styled(TextField)((props) => ({
+  textAlign: "center",
+  "::selection": {
+    background: "transparent",
+  },
+}));
 
-  return (
-    <div className="token" key={token._id}>
-      <TokenInput
-        token={token}
-        textId={textId}
-      // showContextMenu={showContextMenu}
-      />
-      {/* <TokenUnderline token={token} textId={textId} /> */}
-      {/* <ContextMenu menuId={MENU_ID} token={token} textId={textId} /> */}
-    </div>
-  );
-};
+export const SpanComponent = styled(Typography)((props) => ({
+  userSelect: "none",
+  zIndex: 1000,
+  cursor: "pointer",
+  height: "3px",
+  margin: "0 4px",
+  backgroundColor: alpha(props.color, 0.75),
+  "&:hover": {
+    backgroundColor: props.color,
+  },
+}));
 
-const TokenInput = ({ token, textId, showContextMenu }) => {
-  const dispatch = useDispatch();
-  const project = useSelector(selectProject);
-  const bgColourMap = useSelector(selectBgColourMap);
-  const [showTokenPopover, setShowTokenPopover] = useState(false);
-  const [edited, setEdited] = useState(false);
+const Token = ({
+  textId,
+  token,
+  tokenIndex,
+  currentlySelected,
+  selectedTokens,
+}) => {
+  const hasReplacement = token.replacement;
+  const hasSuggestion = token.suggestion;
+  const isOutOfVocab = !token.tags.en;
+  const [editing, setEditing] = useState(false);
+
+  const [state, dispatch] = useContext(ProjectContext);
+
+  // NOTE: Token is selected is for entity annotation mode and contextualisation
+  const tokenIsSelected =
+    currentlySelected || selectedTokens.tokenIds?.includes(token._id);
+
+  const [anchorEl, setAnchorEl] = useState(null);
+
+  const handlePopoverOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handlePopoverClose = () => {
+    setAnchorEl(null);
+    dispatch({
+      type: "UPDATE_TOKEN_VALUE",
+      payload: {
+        textId: textId,
+        tokenIndex: tokenIndex,
+        newValue: hasReplacement
+          ? token.replacement
+          : hasSuggestion
+          ? token.suggestion
+          : token.value,
+      },
+    });
+  };
+
+  const open = Boolean(anchorEl);
+
+  const handleTokenEdit = (e, newToken) => {
+    dispatch({
+      type: "UPDATE_TOKEN_VALUE",
+      payload: { textId: textId, tokenIndex: tokenIndex, newValue: newToken },
+    });
+
+    // console.log(token.currentValue, newToken);
+
+    if (token.currentValue !== newToken) {
+      handlePopoverOpen(e);
+    }
+  };
 
   useEffect(() => {
-    // Detect whether user is editing a token input
     if (
       (token.value !== token.currentValue ||
         (token.replacement && token.value === token.currentValue)) &&
-      token.currentValue !== token.suggested_replacement &&
+      token.currentValue !== token.suggestion &&
       token.currentValue !== token.replacement
     ) {
-      // Check whether the token has been edited by the user or if the token value
-      // has changed due to a suggestion.
-      // Does not trigger if replacement is appled to token already (auto-labelling)
-      setEdited(true);
+      setEditing(true);
     } else {
-      setEdited(false);
-      setShowTokenPopover(false);
+      setEditing(false);
+      setAnchorEl(null);
     }
   }, [token.currentValue]);
 
-  const modifyToken = (targetValue) => {
-    setShowTokenPopover(true);
-    dispatch(updateCurrentValue({ token_id: token._id, value: targetValue }));
-  };
-
-  const bgColourChoice =
-    edited || token.replacement
-      ? bgColourMap["rp"]
-      : token.value !== token.currentValue
-        ? bgColourMap["st"]
-        : token.colour;
-
-  // const popoverProps = {
-  //   token,
-  //   type: "addReplacement",
-  //   dispatch,
-  //   setShowTokenPopover,
-  //   bgColourMap,
-  //   textId,
-  //   projectId: project._id,
-  //   currentValue: token.currentValue
-  // };
+  // const tokenHasSpan = editing || hasReplacement || hasSuggestion;
+  const tokenColor = alpha(
+    editing || hasReplacement
+      ? EditColor
+      : hasSuggestion
+      ? blue[500]
+      : isOutOfVocab
+      ? orange[500]
+      : grey[700],
+    state.tokenizeTextId === null
+      ? 1
+      : state.tokenizeTextId === textId
+      ? 1
+      : 0.25
+  );
 
   return (
-    // <OverlayTrigger
-    //   trigger="click"
-    //   rootClose
-    //   placement="bottom"
-    //   overlay={PopoverManager(popoverProps)}
-    //   show={showTokenPopover}
-    // >
-    <input
-      className="token-input"
-      type="text"
-      name="token"
-      clf={token.clf}
-      placeholder={token.currentValue}
-      value={token.currentValue}
-      onChange={(e) => modifyToken(e.target.value)}
-      style={{
-        backgroundColor: bgColourChoice,
-        width: token.width,
-        color: token.fontColour,
-      }}
-      autoComplete="off"
-      title={`original: ${token.value}\nClass: ${token.clf}`}
-    // onContextMenu={(e) => showContextMenu(e)}
-    />
-    // {/* </OverlayTrigger> */}
+    <Stack
+      key={tokenIndex}
+      direction="column"
+      id="token-container"
+      tokenindex={tokenIndex}
+    >
+      <TokenInputComponent
+        variant="standard"
+        tokenindex={tokenIndex}
+        key={token._id}
+        onChange={(e) => handleTokenEdit(e, e.target.value)}
+        autoComplete="off"
+        value={token.currentValue}
+        inputProps={{
+          style: {
+            textAlign: "center",
+            width: getTokenWidth(token.currentValue),
+            color: tokenColor,
+          },
+        }}
+        InputProps={{
+          disableUnderline: true,
+        }}
+        title={`value: ${token.value} | replacement: ${token.replacement} | suggestion: ${token.suggestion}`}
+      />
+      {tokenIsSelected && (
+        <SpanComponent
+          color={tokenColor}
+          onClick={(e) => handlePopoverOpen(e)}
+          title="Click to modify"
+        />
+      )}
+      <Popover
+        id="edit-span-popover"
+        open={open}
+        anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: "center",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: "left",
+        }}
+        onClose={handlePopoverClose}
+        disableRestoreFocus
+        disableAutoFocus={true}
+        disableEnforceFocus={true}
+        elevation={0}
+        PaperProps={{
+          sx: {
+            display: "flex",
+            border: "1px solid",
+            borderColor: alpha(tokenColor, 0.5),
+          },
+        }}
+      >
+        <EditPopover
+          textId={textId}
+          tokenId={token._id}
+          tokenIndex={tokenIndex}
+          handlePopoverClose={handlePopoverClose}
+          setAnchorEl={setAnchorEl}
+          originalValue={token.value}
+          currentValue={token.currentValue}
+          hasSuggestion={hasSuggestion}
+          hasReplacement={hasReplacement}
+          editing={editing}
+        />
+      </Popover>
+    </Stack>
   );
 };
 
-// const TokenUnderline = ({ token, textId, edited }) => {
-//   const project = useSelector(selectProject);
-//   const bgColourMap = useSelector(selectBgColourMap);
-//   const dispatch = useDispatch();
-//   const [showPopover, setShowPopover] = useState(false);
-
-//   const hasEditOrReplacement =
-//     (token.value !== token.currentValue && edited) || token.replacement;
-//   const hasSuggestion = token.suggested_replacement;
-
-//   const dStyle = {
-//     width: token.width,
-//     backgroundColor: hasEditOrReplacement
-//       ? bgColourMap["rp"]
-//       : hasSuggestion
-//         ? bgColourMap["st"]
-//         : null,
-//   };
-
-//   const popoverReplaceProps = {
-//     token,
-//     type: "removeReplacementPopover",
-//     dispatch,
-//     setShowPopover,
-//     bgColourMap,
-//     projectId: project._id,
-//   };
-
-//   const popoverAddSuggestionProps = {
-//     token,
-//     type: "addSuggestionPopover",
-//     dispatch,
-//     setShowPopover,
-//     bgColourMap,
-//     textId,
-//     projectId: project._id,
-//   };
-
-//   const popover = hasEditOrReplacement
-//     ? PopoverManager(popoverReplaceProps)
-//     : hasSuggestion
-//       ? PopoverManager(popoverAddSuggestionProps)
-//       : null;
-
-//   return (
-//     <div
-//       className="token-underline-container"
-//       style={{
-//         justifyContent: !token.suggested_replacement ? "space-between" : null,
-//         width: token.width,
-//       }}
-//     >
-//       {(hasEditOrReplacement || hasSuggestion) && (
-//         <OverlayTrigger
-//           trigger="focus"
-//           placement="bottom"
-//           rootClose
-//           overlay={popover}
-//           show={showPopover}
-//         >
-//           <div
-//             className="token-underline"
-//             style={dStyle}
-//             onClick={() => setShowPopover(!showPopover)}
-//           />
-//         </OverlayTrigger>
-//       )}
-//     </div>
-//   );
-// };
+export default Token;
