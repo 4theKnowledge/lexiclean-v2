@@ -1,102 +1,72 @@
-import React, { useEffect, useState, useContext } from "react";
+import { useContext } from "react";
 import {
-  Grid,
   Stack,
-  Button,
-  Typography,
-  Paper,
-  LinearProgress,
   Box,
   Divider,
-  Toolbar,
   List,
-  ListItem,
   ListItemButton,
   ListItemText,
   ListItemIcon,
-  Collapse,
-  Skeleton,
-  IconButton,
+  Tooltip,
+  Toolbar,
+  ListItem,
 } from "@mui/material";
-import HelpCenterIcon from "@mui/icons-material/HelpCenter";
-import TouchAppIcon from "@mui/icons-material/TouchApp";
+import MuiDrawer from "@mui/material/Drawer";
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import LogoutIcon from "@mui/icons-material/Logout";
-import { Link, useParams, useNavigate } from "react-router-dom";
-import { teal, grey } from "@mui/material/colors";
-import LocationSearchingIcon from "@mui/icons-material/LocationSearching";
-
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
+import { Link, useParams } from "react-router-dom";
+import { blue } from "@mui/material/colors";
 import SaveIcon from "@mui/icons-material/Save";
-import ToggleOffIcon from "@mui/icons-material/ToggleOff";
-import ToggleOnIcon from "@mui/icons-material/ToggleOn";
-import ExpandLess from "@mui/icons-material/ExpandLess";
-import ExpandMore from "@mui/icons-material/ExpandMore";
-import FilterListIcon from "@mui/icons-material/FilterList";
-import SettingsIcon from "@mui/icons-material/Settings";
 import axios from "axios";
-
-import Filters from "./Filters";
-import Contextualiser from "./Contextualiser";
-
+import ShortcutIcon from "@mui/icons-material/Shortcut";
+import HomeIcon from "@mui/icons-material/Home";
 import { ProjectContext } from "../../../shared/context/project-context";
+import EntitySelector from "./EntitySelector";
+import ToggleOnIcon from "@mui/icons-material/ToggleOn";
+import ToggleOffIcon from "@mui/icons-material/ToggleOff";
+import { styled } from "@mui/material/styles";
 
-const LinearProgressWithLabel = ({ value, title }) => {
-  return (
-    <Box sx={{ display: "flex", alignItems: "center", height: "20px" }}>
-      <Box sx={{ width: "100%", mr: 1 }}>
-        <LinearProgress
-          variant="determinate"
-          value={value}
-          title={title}
-          sx={{ height: "20px" }}
-        />
-      </Box>
-      <Box sx={{ minWidth: 35, height: "100%" }}>
-        <Typography variant="body2" color="text.secondary">{`${Math.round(
-          value
-        )}%`}</Typography>
-      </Box>
-    </Box>
-  );
-};
+import UserDetail from "../../../shared/components/Layout/UserDetail";
+import BrandToolbar from "../../../shared/components/Layout/BrandToolbar";
+import Contextualiser from "./Contextualiser";
+import LogoutButton from "../../../shared/components/Layout/LogoutButton";
+import { ANNOTATION_SIDEBAR_WIDTH } from "../../../shared/constants/layout";
+
+const Drawer = styled(MuiDrawer, {
+  shouldForwardProp: (prop) => prop !== "open",
+})(({ theme, open }) => ({
+  "& .MuiDrawer-paper": {
+    position: "relative",
+    whiteSpace: "nowrap",
+    width: ANNOTATION_SIDEBAR_WIDTH,
+    transition: theme.transitions.create("width", {
+      easing: theme.transitions.easing.sharp,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+    boxSizing: "border-box",
+    ...(!open && {
+      overflowX: "hidden",
+      transition: theme.transitions.create("width", {
+        easing: theme.transitions.easing.sharp,
+        duration: theme.transitions.duration.leavingScreen,
+      }),
+      width: theme.spacing(7),
+      [theme.breakpoints.up("sm")]: {
+        width: theme.spacing(9),
+      },
+    }),
+  },
+}));
 
 const Sidebar = () => {
   const { projectId } = useParams();
-  const navigate = useNavigate();
   const [state, dispatch] = useContext(ProjectContext);
-  const [expand, setExpand] = useState(false);
-  const [quickFilterApplied, setQuickFilterApplied] = useState(false);
 
-  const savePending =
+  const unsavedItemsCount =
     state.texts &&
-    Object.values(state.texts).filter((text) => text.saved).length !==
-      Object.values(state.texts).length;
+    Object.values(state.texts).length -
+      Object.values(state.texts).filter((text) => text.saved).length;
 
-  const handleExpand = () => {
-    setExpand(!expand);
-  };
-
-  const handleQuickFilter = () => {
-    // Set filter and trigger reload of texts...
-    dispatch({
-      type: "SET_VALUE",
-      payload: {
-        filters: {
-          ...state.filters,
-          searchTerm: quickFilterApplied ? "" : state.selectedTokenValue,
-        },
-      },
-    });
-    dispatch({ type: "SET_PAGE", payload: 1 });
-    navigate(`/project/${state.projectId}/page=1`);
-    setQuickFilterApplied(!quickFilterApplied);
-  };
-
-  useEffect(() => {
-    // Allows user to jump between selections
-    setQuickFilterApplied(false);
-  }, [state.selectedTokenValue]);
+  const savePending = unsavedItemsCount !== 0;
 
   const handlePageSave = async () => {
     axios
@@ -124,166 +94,164 @@ const Sidebar = () => {
       .catch((error) => console.log(`Error: ${error}`));
   };
 
+  const username = "test"; //user ? user["https://example.com/username"] : "";
+  const email = "test@email.com"; //user ? user["name"] : "";
+  const color = blue[500];
+  // user
+  //   ? user["https://example.com/color"]
+  //   : theme.palette.primary.main;
+
   return (
-    <React.Fragment>
-      <Grid item container direction="column" justifyContent="space-apart">
-        <Box>
-          <LinearProgressWithLabel
-            value={state.progress.value}
-            title={state.progress.title}
-          />
+    <Drawer
+      variant="permanent"
+      open={true}
+      sx={{ backgroundColor: "background.light" }}
+    >
+      <Toolbar
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          px: [1],
+          color: "text.secondary",
+          backgroundColor: "background.light",
+        }}
+      >
+        <Box
+          display="flex"
+          alignItems="center"
+          justifyContent="left"
+          width="100%"
+        >
+          <BrandToolbar />
         </Box>
-        <Divider />
-        <List>
-          <ListItem
-            key="save-btn"
-            disablePadding
-            title="Click to toggle between annotation modes"
-          >
-            <ListItemButton onClick={handlePageSave}>
-              <ListItemIcon
-                sx={{
-                  color: savePending ? teal[500] : grey[500],
-                }}
+      </Toolbar>
+      <Divider flexItem />
+      <Box
+        display="flex"
+        flexDirection="column"
+        justifyContent="space-between"
+        height="100%"
+        sx={{ backgroundColor: "background.light" }}
+      >
+        <Box p={2}>
+          <Stack direction="column" spacing={2}>
+            <EntitySelector />
+            <Contextualiser />
+          </Stack>
+        </Box>
+        <Box>
+          <Box component="nav" p="1rem 1rem 1rem 0rem">
+            <List>
+              <Tooltip
+                title="Double click to save all texts on the current page"
+                placement="right"
               >
-                <SaveIcon />
-              </ListItemIcon>
-              <ListItemText primary={"Save page"} />
-            </ListItemButton>
-          </ListItem>
-          {state.project.parallelCorpus && (
-            <ListItem
-              key="reference-switch-btn"
-              disablePadding
-              title="Click to show/hide reference texts"
+                <ListItemButton
+                  onDoubleClick={handlePageSave}
+                  sx={{ color: "text.secondary" }}
+                >
+                  <ListItemIcon>
+                    <SaveIcon color={savePending ? "primary" : "default"} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={`Save Page ${
+                      savePending ? "(" + unsavedItemsCount + ")" : ""
+                    }`}
+                  />
+                </ListItemButton>
+              </Tooltip>
+              {state.project && state.project.parallelCorpus && (
+                <Tooltip
+                  title="Click to toggle reference text visibility"
+                  placement="right"
+                >
+                  <ListItemButton
+                    onClick={() =>
+                      dispatch({
+                        type: "SET_VALUE",
+                        payload: { showReferences: !state.showReferences },
+                      })
+                    }
+                    sx={{ color: "text.secondary" }}
+                    key="reference-switch-btn"
+                  >
+                    <ListItemIcon>
+                      {state.showReferences ? (
+                        <ToggleOnIcon />
+                      ) : (
+                        <ToggleOffIcon />
+                      )}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={`${
+                        state.showReferences ? "Hide" : "Show"
+                      } Reference Texts`}
+                    />
+                  </ListItemButton>
+                </Tooltip>
+              )}
+              {/* <ListItemButton
+              disabled
               onClick={() =>
                 dispatch({
                   type: "SET_VALUE",
-                  payload: { showReferences: !state.showReferences },
+                  payload: { showShortcutModal: true },
                 })
               }
+              sx={{
+                minHeight: 48,
+                justifyContent: "initial",
+              }}
             >
-              <ListItemButton>
-                <ListItemIcon
-                  sx={{
-                    color: state.showReferences ? teal[500] : grey[500],
-                  }}
-                >
-                  {state.showReferences ? <ToggleOnIcon /> : <ToggleOffIcon />}
-                </ListItemIcon>
-                <ListItemText primary={"Show Reference Texts"} />
-              </ListItemButton>
-            </ListItem>
-          )}
-        </List>
-        <Divider />
-      </Grid>
-      <List>
-        <ListItemButton onClick={handleExpand}>
-          <ListItemIcon>
-            <FilterListIcon />
-          </ListItemIcon>
-          <ListItemText primary="Filters" />
-          {expand ? <ExpandLess /> : <ExpandMore />}
-        </ListItemButton>
-        <Collapse in={expand} timeout="auto" unmountOnExit>
-          <Filters />
-        </Collapse>
-      </List>
-      <Divider />
-      <List>
-        <ListItem disabled={state.selectedTokenValue === null}>
-          <ListItemIcon>
-            <HelpCenterIcon />
-          </ListItemIcon>
-          <ListItemText primary={"Contextual Help"} />
-        </ListItem>
-        <Contextualiser />
-      </List>
-      <Divider />
-      <List>
-        <ListItemButton
-          disabled={state.selectedTokenValue === null}
-          title="Search for the currently selected token"
-          onClick={handleQuickFilter}
-        >
-          <ListItemIcon>
-            <LocationSearchingIcon />
-          </ListItemIcon>
-          <ListItemText
-            primary={
-              state.selectedTokenValue !== null
-                ? `Quick Filter (${
-                    state.selectedTokenValue !== null
-                      ? state.selectedTokenValue
-                      : ""
-                  })`
-                : "Quick Filter"
-            }
-            secondary={
-              state.selectedTokenValue !== null
-                ? `${quickFilterApplied ? "click to undo" : "click to apply"}`
-                : ""
-            }
-          />
-        </ListItemButton>
-      </List>
-      <Divider />
-      <List>
-        <ListItemButton
-          disabled
-          // component={Link}
-          // to={`/dashboard/${projectId}/overview`}
-          title="Click to access annotation settings"
-        >
-          <ListItemIcon>
-            <SettingsIcon />
-          </ListItemIcon>
-          <ListItemText primary={"Settings"} />
-        </ListItemButton>
-        <ListItemButton
-          disabled
-          component={Link}
-          to={`/dashboard/${projectId}/overview`}
-          title="Click to go to project dashboard"
-        >
-          <ListItemIcon>
-            <DashboardIcon />
-          </ListItemIcon>
-          <ListItemText primary={"Dashboard"} />
-        </ListItemButton>
-        <ListItemButton
-          title="Click to logout"
-          //   onClick={() => logout({ returnTo: window.location.origin })}
-        >
-          <ListItemIcon>
-            <LogoutIcon />
-          </ListItemIcon>
-          <ListItemText primary={"Logout"} />
-        </ListItemButton>
-      </List>
-      <Divider />
-      <List>
-        <ListItem>
-          <ListItemText>
-            <Stack direction="row" alignItems="center" justifyContent="center">
-              <AccountCircleIcon
-                sx={{ fontSize: "1.25rem", marginRight: "0.25rem" }}
-              />
-              <Typography
-                sx={
-                  {
-                    //   color: user && user["https://example.com/color"],
-                  }
-                }
+              <ListItemIcon
+                sx={{
+                  minWidth: 0,
+                  justifyContent: "center",
+                  mr: 4,
+                }}
               >
-                {/* {user && user["https://example.com/username"]} */}
-              </Typography>
+                <ShortcutIcon />
+              </ListItemIcon>
+              <ListItemText primary={"Keyboard Shortcuts"} />
+            </ListItemButton> */}
+              <ListItem
+                component={Link}
+                to={`/dashboard/${projectId}`}
+                sx={{ color: "text.secondary" }}
+              >
+                <ListItemIcon>
+                  <DashboardIcon />
+                </ListItemIcon>
+                <ListItemText primary="Dashboard" />
+              </ListItem>
+              <ListItem
+                component={Link}
+                to="/projects"
+                sx={{ color: "text.secondary" }}
+              >
+                <ListItemIcon>
+                  <HomeIcon />
+                </ListItemIcon>
+                <ListItemText primary="Projects" />
+              </ListItem>
+            </List>
+          </Box>
+          <Divider />
+          <Box display="flex" p={2} justifyContent="center" alignItems="center">
+            <Stack
+              width="100%"
+              spacing={2}
+              direction="column"
+              alignItems="center"
+            >
+              <UserDetail />
+              <LogoutButton />
             </Stack>
-          </ListItemText>
-        </ListItem>
-      </List>
-    </React.Fragment>
+          </Box>
+        </Box>
+      </Box>
+    </Drawer>
   );
 };
 
