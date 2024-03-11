@@ -525,12 +525,11 @@ router.get("/progress/:projectId", async (req, res) => {
       saved: true,
     });
 
-    res.json({
-      progress: {
-        value: Math.round((savedTexts / totalTexts) * 100),
-        title: `${savedTexts}/${totalTexts}`,
-      },
-    });
+    const progress = {
+      value: Math.round((savedTexts / totalTexts) * 100),
+      title: `${savedTexts}/${totalTexts}`,
+    };
+    res.json({ progress });
   } catch (error) {
     console.log(`Error: ${error}`);
     res.json({ details: error });
