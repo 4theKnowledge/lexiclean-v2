@@ -14,7 +14,7 @@ import {
   IconButton,
   Tooltip,
 } from "@mui/material";
-import { ProjectContext } from "../../../shared/context/project-context";
+import { ProjectContext } from "../../../shared/context/ProjectContext";
 import {
   useNavigate,
   useSearchParams,
