@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useEffect } from "react";
 import { Stack, IconButton, Typography, Divider, Tooltip } from "@mui/material";
 import { teal, red, orange, grey } from "@mui/material/colors";
 // import { useAuth0 } from "@auth0/auth0-react";
@@ -13,10 +13,20 @@ import ContentCutIcon from "@mui/icons-material/ContentCut";
 import UndoIcon from "@mui/icons-material/Undo";
 import RestoreIcon from "@mui/icons-material/Restore";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import { EditColor, StrikeColor } from "../../shared/constants/project";
 import { ProjectContext } from "../../shared/context/project-context";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import { useSnackbar } from "../../shared/context/SnackbarContext";
+
+import {
+  acceptTokenAction,
+  applyTokenAction,
+  deleteTokenAction,
+  removeTokenAction,
+  splitTokenAction,
+} from "../../shared/api/project";
+import { useTheme } from "@mui/material/styles";
 
 const EditPopover = (props) => {
   const {
@@ -32,7 +42,11 @@ const EditPopover = (props) => {
     editing,
   } = props;
   const [state, dispatch] = useContext(ProjectContext);
+  const navigate = useNavigate();
   const [showExtraOptions, setShowExtraOptions] = useState(false);
+  const [quickFilterApplied, setQuickFilterApplied] = useState(false);
+  const theme = useTheme();
+  const { dispatch: snackbarDispatch } = useSnackbar();
 
   const handleApplyAction = async (applyAll) => {
     const payload = {
@@ -44,25 +58,32 @@ const EditPopover = (props) => {
       textIds: Object.keys(state.texts),
     };
 
-    axios
-      .patch("/api/token/add", payload)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({
-            type: "TOKEN_APPLY",
-            payload: {
-              ...payload,
-              ...response.data,
-              tokenIndex: tokenIndex,
-              originalValue: originalValue,
-            },
-          });
-          setAnchorEl(null);
-        }
-      })
-      .catch((error) =>
-        console.log(`Error occurred applying token replacement ${error}`)
-      );
+    try {
+      const response = await applyTokenAction(payload);
+      if (response.status === 200) {
+        dispatch({
+          type: "TOKEN_APPLY",
+          payload: {
+            ...payload,
+            ...response.data,
+            tokenIndex: tokenIndex,
+            originalValue: originalValue,
+          },
+        });
+        setAnchorEl(null);
+        snackbarDispatch({
+          type: "SHOW",
+          message: `Updated '${originalValue}' to '${currentValue}' ${response.data.matches} times`,
+          severity: "success",
+        });
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Error occurred applying token replacement ${error}`,
+        severity: "error",
+      });
+    }
   };
 
   const handleDeleteAction = async (applyAll) => {
@@ -72,24 +93,36 @@ const EditPopover = (props) => {
       textId: textId,
       textIds: Object.keys(state.texts),
     };
-    axios
-      .patch("/api/token/delete", payload)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({
-            type: "TOKEN_DELETE",
-            payload: {
-              ...payload,
-              ...response.data,
-              tokenIndex: tokenIndex,
-              originalValue: originalValue,
-              currentValue: currentValue,
-            },
-          });
-          setAnchorEl(null);
-        }
-      })
-      .catch((error) => console.log(`Error occurred deleting token ${error}`));
+
+    try {
+      const response = await deleteTokenAction(payload);
+      if (response.status === 200) {
+        dispatch({
+          type: "TOKEN_DELETE",
+          payload: {
+            ...payload,
+            ...response.data,
+            tokenIndex: tokenIndex,
+            originalValue: originalValue,
+            currentValue: currentValue,
+          },
+        });
+        setAnchorEl(null);
+        snackbarDispatch({
+          type: "SHOW",
+          message: `Deleted '${originalValue}' (and similar ${
+            applyAll ? "in all texts" : "occurrence"
+          }) successfully.`,
+          severity: "success",
+        });
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Error occurred deleting token: ${error}`,
+        severity: "error",
+      });
+    }
   };
 
   const handleAcceptAction = async (applyAll) => {
@@ -99,24 +132,38 @@ const EditPopover = (props) => {
       applyAll: applyAll,
       textIds: Object.keys(state.texts),
     };
-    axios
-      .patch("/api/token/accept", payload)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({
-            type: "TOKEN_ACCEPT",
-            payload: {
-              ...payload,
-              ...response.data,
-              tokenIndex: tokenIndex,
-              originalValue: originalValue,
-              currentValue: currentValue,
-            },
-          });
-          setAnchorEl(null);
-        }
-      })
-      .catch((error) => console.log(`Error occurred accepting token ${error}`));
+
+    try {
+      const response = await acceptTokenAction(payload);
+      if (response.status === 200) {
+        dispatch({
+          type: "TOKEN_ACCEPT",
+          payload: {
+            ...payload,
+            ...response.data,
+            tokenIndex: tokenIndex,
+            originalValue: originalValue,
+            currentValue: currentValue,
+          },
+        });
+        setAnchorEl(null);
+        const successMessage = applyAll
+          ? `Token '${originalValue}' accepted for all instances successfully.`
+          : `Token '${originalValue}' accepted for the current instance successfully.`;
+
+        snackbarDispatch({
+          type: "SHOW",
+          message: successMessage,
+          severity: "success",
+        });
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Error occurred accepting token: ${error}`,
+        severity: "error",
+      });
+    }
   };
 
   const handleSplitAction = async () => {
@@ -127,16 +174,24 @@ const EditPopover = (props) => {
       currentValue: currentValue,
       // applyAll: applyAll  // TODO
     };
-    axios
-      .patch("/api/token/split", payload)
-      .then((response) => {
-        if (response.status === 200) {
-          console.log(response);
+    try {
+      const response = await splitTokenAction(payload);
 
-          dispatch({ type: "TOKEN_SPLIT", payload: response.data });
-        }
-      })
-      .catch((error) => console.log(`Error: ${error}`));
+      if (response.status === 200) {
+        dispatch({ type: "TOKEN_SPLIT", payload: response.data });
+        snackbarDispatch({
+          type: "SHOW",
+          message: "Token split successfully.",
+          severity: "success",
+        });
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Error splitting token: ${error}`,
+        severity: "error",
+      });
+    }
   };
 
   const handleRemoveTokenAction = async (applyAll) => {
@@ -147,21 +202,32 @@ const EditPopover = (props) => {
       textIds: Object.keys(state.texts),
     };
 
-    axios
-      .patch("/api/token/remove", payload)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({
-            type: "TOKEN_REMOVE",
-            payload: {
-              ...payload,
-              ...response.data,
-              originalValue: originalValue,
-            },
-          });
-        }
-      })
-      .catch((error) => console.log(`Error: ${error}`));
+    try {
+      const response = removeTokenAction(payload);
+      if (response.status === 200) {
+        dispatch({
+          type: "TOKEN_REMOVE",
+          payload: {
+            ...payload,
+            ...response.data,
+            originalValue: originalValue,
+          },
+        });
+        snackbarDispatch({
+          type: "SHOW",
+          message: `Permanently removed token ${originalValue} ${
+            applyAll ? "in all texts" : "occurrence"
+          }`,
+          severity: "success",
+        });
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Erorr deleting token(s): ${error}`,
+        severity: "error",
+      });
+    }
   };
 
   const handleRemoveTokenCase = () => {
@@ -174,6 +240,27 @@ const EditPopover = (props) => {
       },
     });
   };
+
+  const handleQuickFilter = () => {
+    // Set filter and trigger reload of texts...
+    dispatch({
+      type: "SET_VALUE",
+      payload: {
+        filters: {
+          ...state.filters,
+          searchTerm: quickFilterApplied ? "" : state.selectedTokenValue,
+        },
+      },
+    });
+    dispatch({ type: "SET_PAGE", payload: 1 });
+    navigate(`/project/${state.projectId}/page=1`);
+    setQuickFilterApplied(!quickFilterApplied);
+  };
+
+  useEffect(() => {
+    // Allows user to jump between selections
+    setQuickFilterApplied(false);
+  }, [state.selectedTokenValue]);
 
   const showOperations = editing || hasReplacement || hasSuggestion;
   const showSplitTokenOperation = /\s/.test(currentValue);
@@ -249,13 +336,16 @@ const EditPopover = (props) => {
               variant="body2"
               sx={{
                 textDecoration: "line-through",
-                textDecorationColor: StrikeColor,
+                textDecorationColor: theme.palette.token.strike,
               }}
             >
               {originalValue}
             </Typography>
             <ArrowRightAltIcon sx={{ color: grey[500] }} />
-            <Typography variant="body2" sx={{ color: EditColor }}>
+            <Typography
+              variant="body2"
+              sx={{ color: theme.palette.token.editing }}
+            >
               {currentValue}
             </Typography>
           </Stack>
@@ -283,6 +373,11 @@ const EditPopover = (props) => {
         {showExtraOptions || !showOperations ? (
           <>
             {showOperations && <Divider orientation="vertical" />}
+            <Tooltip title="Click to perform a quick filter on this token">
+              <IconButton size="small" onClick={handleQuickFilter}>
+                <FilterListIcon size="small" sx={{ fontSize: "1rem" }} />
+              </IconButton>
+            </Tooltip>
             {showSplitTokenOperation && (
               <Tooltip title="Click to split token">
                 <IconButton size="small" onClick={handleSplitAction}>
