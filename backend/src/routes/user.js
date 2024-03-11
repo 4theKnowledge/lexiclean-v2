@@ -38,7 +38,7 @@ router.get("/system", async (req, res) => {
 router.patch("/:userId", async (req, res) => {
   try {
     // Extract userID from request parameters (this is the Auth0 `sub`)
-    const userId = req.params.sub;
+    const userId = req.params.userId;
 
     console.log(`userId: ${userId}`);
 
