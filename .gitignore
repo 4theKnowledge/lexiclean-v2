@@ -26,10 +26,12 @@ yarn-error.log*
 
 .vscode
 .env
-server/logger/logs.json
+backend/src/logger/logs.json
 
 /dev
 /test
 
 
 */venv
+.babelrc
+*/__pycache__/*
