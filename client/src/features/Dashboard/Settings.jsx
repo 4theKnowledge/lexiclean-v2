@@ -1,99 +1,89 @@
-import React, { useState, useEffect, useContext } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Box, Button, Stack, TextField, Typography } from "@mui/material";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import StyledCard from "./StyledCard";
 
-import DeleteIcon from "@mui/icons-material/Delete";
-import DownloadIcon from "@mui/icons-material/Download";
-import {
-  Box,
-  Button,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-import axios from "axios";
-
-const Settings = ({ loading, data }) => {
+const Settings = ({ loading, data, downloadProject, deleteProject }) => {
   const { projectId } = useParams();
-  const navigate = useNavigate();
-
   const [deleteName, setDeleteName] = useState("");
 
-  const downloadProject = async () => {
-    const response = await axios.get(`/api/project/download/${projectId}`);
-
-    if (response.status === 200) {
-      // Prepare for file download
-      const fileName = `${data.name.slice(0, 25).replace(" ", "_")}`;
-      const json = JSON.stringify(response.data, null, 2);
-      const blob = new Blob([json], { type: "application/json" });
-      const href = await URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = href;
-      link.download = fileName + ".json";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else {
-      console.log("download failed");
-    }
-  };
-
-  const deleteProject = async () => {
-    await axios
-      .delete(`/api/project/${projectId}`)
-      .then((response) => {
-        if (response.status === 200) {
-          navigate("/home");
-        }
-      })
-      .catch((error) => {
-        console.log(`Error: ${error}`);
-      });
-  };
-
   return (
-    <Box>
-      <Paper>
-        <Stack>
-          {!loading &&
-            Object.entries(data.preprocessing).map(({ key, value }) => (
-              <p>
-                {key} {value}
-              </p>
-            ))}
-        </Stack>
-      </Paper>
-      <Box>
-        <Typography>Delete Project</Typography>
-        <TextField
-          label="Enter Project Name"
-          onChange={(e) => setDeleteName(e.target.value)}
-          value={deleteName}
-        />
-        <Button
-          onClick={deleteProject}
-          disabled={loading || data.name !== deleteName}
+    <StyledCard title={"Settings"}>
+      <Box display="flex" flexDirection="column">
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          mb={4}
+          alignItems="center"
         >
-          Delete
-        </Button>
+          <Box>
+            <Typography fontWeight="bold" color="text.secondary">
+              Annotate Project
+            </Typography>
+            <Typography variant="caption">
+              Click to navigate to your project to commence annotation.
+            </Typography>
+          </Box>
+          <Button
+            component={Link}
+            to={`/project/${projectId}`}
+            variant="contained"
+          >
+            Annotate
+          </Button>
+        </Box>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          mb={4}
+          alignItems="center"
+        >
+          <Box>
+            <Typography fontWeight="bold" color="text.secondary">
+              Download Dataset
+            </Typography>
+            <Typography variant="caption">
+              Click to download this projects data as a JSON file.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            onClick={downloadProject}
+            disabled={loading}
+          >
+            Download
+          </Button>
+        </Box>
+        <Box display="flex" justifyContent="space-between" alignItems="center">
+          <Box>
+            <Typography fontWeight="bold" color="text.secondary">
+              Delete Project
+            </Typography>
+            <Typography variant="caption">
+              Enter the projects name and click 'delete' to permanently remove
+              this project. This is irreversible.
+            </Typography>
+          </Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              placeholder={`Enter project name (${data.details.name})`}
+              onChange={(e) => setDeleteName(e.target.value)}
+              value={deleteName}
+              size="small"
+              color="error"
+            />
+            <Button
+              variant="contained"
+              onClick={deleteProject}
+              disabled={loading || data.details.name !== deleteName}
+              color="error"
+            >
+              Delete
+            </Button>
+          </Stack>
+        </Box>
       </Box>
-      <Box>
-        <Typography>Download Dataset</Typography>
-        <Button onClick={downloadProject} disabled={loading}>
-          Download
-        </Button>
-      </Box>
-      name: {!loading && data.name}
-      <br />
-      createdAt: {!loading && data.createdAt}
-      <br />
-      description: {!loading && data.description}
-      <br />
-      startingVocabSize: {!loading && data.metrics.startingVocabSize}
-      <br />
-      startingOOVTokenCount: {!loading && data.metrics.startingOOVTokenCount}
-    </Box>
+    </StyledCard>
   );
 };
 
