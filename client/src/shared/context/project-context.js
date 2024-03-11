@@ -1,6 +1,23 @@
 import * as React from "react";
-import axios from "axios";
 import { updateTexts } from "../utils/project-context";
+import { getProgress, getProject, getTexts } from "../api/project";
+import { useCallback } from "react";
+
+const updateTagsById = (data, targetId, newTags) => {
+  // Create a new object to avoid mutating the original data
+  const updatedData = { ...data };
+
+  // Iterate over each key in the object
+  Object.keys(updatedData).forEach((key) => {
+    // Check if the current item's _id matches the targetId
+    if (updatedData[key]._id === targetId) {
+      // Update the tags object for this item
+      updatedData[key].tags = newTags;
+    }
+  });
+
+  return updatedData;
+};
 
 const initialState = {
   filters: {
@@ -27,15 +44,14 @@ const initialState = {
   tokenizeTextId: null,
   currentTextSelected: null,
   tokenIdsSelected: [],
-  selectedTokens: { tokenIds: [], textId: null },
   selectedTokenValue: null,
+  showFilterModel: false,
+  selectedToken: null,
 };
 
 export const ProjectContext = React.createContext();
 
 const reducer = (state, action) => {
-  // console.log("[REDUCER]", action.type, action.payload);
-
   switch (action.type) {
     case "SET_PROJECTID": {
       return { ...state, projectId: action.payload };
@@ -51,7 +67,6 @@ const reducer = (state, action) => {
       };
     }
     case "SET_PROJECT_METRICS": {
-      //
       return state;
     }
     case "SET_TEXTS": {
@@ -116,23 +131,9 @@ const reducer = (state, action) => {
         action.payload.replacement
       );
 
-      // Set toast values and set toast to active for user to see
-      const toastInfo = {
-        action: "apply",
-        applyAll: action.payload.applyAll,
-        content: {
-          oldValue: action.payload.originalValue,
-          newValue: action.payload.replacement,
-          count: action.payload.matches,
-          //     textIds: updatedTextIds,
-        },
-      };
-
       return {
         ...state,
         texts: updatedTexts,
-        toastInfo: toastInfo,
-        showToast: true,
       };
     }
     case "TOKEN_DELETE": {
@@ -143,24 +144,9 @@ const reducer = (state, action) => {
         action.payload.tokenId,
         action.payload.replacement
       );
-
-      // Set toast values and set toast to active for user to see
-      const toastInfo = {
-        action: "delete",
-        applyAll: action.payload.applyAll,
-        content: {
-          oldValue: action.payload.currentValue, // Old value as its being removed.
-          newValue: action.payload.originalValue,
-          count: action.payload.matches,
-          //     textIds: updatedTextIds,
-        },
-      };
-
       return {
         ...state,
         texts: updatedTexts,
-        toastInfo: toastInfo,
-        showToast: true,
       };
     }
     case "TOKEN_ACCEPT": {
@@ -172,23 +158,9 @@ const reducer = (state, action) => {
         action.payload.replacement
       );
 
-      // Set toast values and set toast to active for user to see
-      const toastInfo = {
-        action: "accept",
-        applyAll: action.payload.applyAll,
-        content: {
-          oldValue: action.payload.originalValue,
-          newValue: action.payload.currentValue,
-          count: action.payload.matches,
-          //     textIds: updatedTextIds,
-        },
-      };
-
       return {
         ...state,
         texts: updatedTexts,
-        toastInfo: toastInfo,
-        showToast: true,
       };
     }
     case "TOKEN_SPLIT": {
@@ -196,22 +168,9 @@ const reducer = (state, action) => {
     }
     case "TOKEN_REMOVE": {
       // Removes token from text
-      // Set toast values and set toast to active for user to see
-
-      const toastInfo = {
-        action: "remove",
-        applyAll: action.payload.applyAll,
-        content: {
-          oldValue: action.payload.originalValue,
-          count: action.payload.matches,
-        },
-      };
-
       return {
         ...state,
         texts: { ...state.texts, ...action.payload.textTokenObjects },
-        toastInfo: toastInfo,
-        showToast: true,
       };
     }
     case "TOKENIZE": {
@@ -222,6 +181,39 @@ const reducer = (state, action) => {
         tokenizeTextId: null,
       };
     }
+
+    case "APPLY_TAG": {
+      const { applyAll, tokenId, tags, textId } = action.payload;
+      const updatedState = { ...state };
+
+      if (applyAll) {
+      } else {
+        const updatedTokens = updateTagsById(
+          updatedState.texts[textId].tokens,
+          tokenId,
+          tags
+        );
+        updatedState.texts[textId].tokens = updatedTokens;
+      }
+
+      return updatedState;
+    }
+    case "DELETE_TAG": {
+      const { applyAll, tokenId, tags, textId } = action.payload;
+      const updatedState = { ...state };
+      if (applyAll) {
+      } else {
+        const updatedTokens = updateTagsById(
+          updatedState.texts[textId].tokens,
+          tokenId,
+          tags
+        );
+        updatedState.texts[textId].tokens = updatedTokens;
+      }
+
+      return updatedState;
+    }
+
     case "SET_SHOW_TOAST": {
       return { ...state, showToast: action.payload };
     }
@@ -231,60 +223,45 @@ const reducer = (state, action) => {
   }
 };
 
-export const ProjectProvider = (props) => {
+export const ProjectProvider = ({ children }) => {
   const [state, dispatch] = React.useReducer(reducer, initialState);
 
-  React.useEffect(() => {
-    if (state.projectId) {
-      fetchProject(state.projectId);
-      fetchProgress(state.projectId);
-    }
-  }, [state.projectId]);
+  const getProjectDetailsCallback = useCallback(() => {
+    if (!state.projectId) return;
+    getProgress(state.projectId, dispatch);
+    getProject(state.projectId, dispatch);
+  }, [state.projectId, dispatch]);
+
+  const getTextsCallback = useCallback(() => {
+    if (!state.textsLoading || !state.projectId) return;
+
+    getTexts(
+      state.projectId,
+      state.filters,
+      state.pageNumber,
+      state.pageLimit,
+      dispatch
+    );
+  }, [
+    state.textsLoading,
+    state.projectId,
+    // state.filters,
+    // state.pageNumber,
+    // state.pageLimit,
+    dispatch,
+  ]);
 
   React.useEffect(() => {
-    if (state.textsLoading && state.projectId) {
-      fetchTexts(
-        state.projectId,
-        state.filters,
-        state.pageNumber,
-        state.pageLimit
-      );
-    }
-  }, [state.textsLoading, state.projectId, state.pageNumber]);
+    getProjectDetailsCallback();
+  }, [getProjectDetailsCallback]);
 
-  const fetchProgress = async (projectId) => {
-    axios.get(`/api/project/progress/${projectId}`).then((response) => {
-      dispatch({ type: "SET_VALUE", payload: response.data }).catch((error) =>
-        console.log(`error fetching project progresss: ${error}`)
-      );
-    });
-  };
-
-  const fetchProject = async (projectId) => {
-    axios
-      .get(`/api/project/${projectId}`)
-      .then((response) => {
-        dispatch({ type: "SET_PROJECT", payload: response.data });
-      })
-      .catch((error) => console.log(`error fetching project: ${error}`));
-  };
-
-  const fetchTexts = async (projectId, filters, pageNumber, pageLimit) => {
-    axios
-      .post(
-        "/api/text/filter",
-        { projectId: projectId, filters: filters },
-        { params: { page: pageNumber, limit: pageLimit } }
-      )
-      .then((response) => {
-        dispatch({ type: "SET_TEXTS", payload: response.data });
-      })
-      .catch((error) => console.log(`error fetching texts: ${error}`));
-  };
+  React.useEffect(() => {
+    getTextsCallback();
+  }, [getTextsCallback]);
 
   return (
     <ProjectContext.Provider value={[state, dispatch]}>
-      {props.children}
+      {children}
     </ProjectContext.Provider>
   );
 };
