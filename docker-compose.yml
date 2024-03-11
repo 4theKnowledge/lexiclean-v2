@@ -1,0 +1,30 @@
+version: '3.8'
+services:
+  mongodb:
+    image: mongo
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+  
+  backend:
+    build: ./backend
+    ports:
+      - "3001:3001"
+    environment:
+      DB_URI: mongodb://mongodb:27017/lexiclean?authSource=admin
+    command: sh -c "node ./src/setup.js && node ./src/server.js"
+    depends_on:
+      - mongodb
+
+  frontend:
+    build: ./client
+    environment:
+      - REACT_APP_API_URL=http://localhost:3001
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+volumes:
+  mongodb_data:
