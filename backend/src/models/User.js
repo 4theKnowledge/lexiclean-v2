@@ -18,7 +18,8 @@ const UserSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
-      required: true,
+      required: false,
+      default: "/static/avatars/default.jpg",
     },
     roles: {
       type: [String],
@@ -27,19 +28,25 @@ const UserSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
       required: true,
+      default: Date.now,
     },
     signUpDate: {
       type: Date,
       required: true,
+      default: Date.now,
     },
     membershipLevel: {
       type: String,
-      required: true,
       default: "basic",
     },
     openAIKey: {
       type: String,
       default: "",
+    },
+    auth0Id: {
+      type: String,
+      required: true,
+      unique: true,
     },
   },
   { _id: true, collection: "users" }
