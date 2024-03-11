@@ -1,19 +1,13 @@
 import { useState, useEffect } from "react";
-import axios from "../utils/api-interceptor";
+import axiosInstance from "../../shared/api/axiosInstance";
 import {
   Grid,
   Typography,
   Box,
-  Stack,
-  List,
-  ListItem,
-  ListItemText,
-  Drawer,
-  CssBaseline,
-  Toolbar,
   Divider,
-  ListItemButton,
-  ListItemIcon,
+  Paper,
+  Chip,
+  Button,
 } from "@mui/material";
 import LoadingButton from "@mui/lab/LoadingButton";
 
@@ -35,6 +29,8 @@ import { useParams, Link } from "react-router-dom";
 import { SuccessColor } from "../../shared/constants/create";
 import { DrawerWidth } from "../../shared/constants/layout";
 
+import DoneIcon from "@mui/icons-material/Done";
+import WarningIcon from "@mui/icons-material/Warning";
 import {
   ValidateCreateDetails,
   ValidateCreateSchema,
@@ -42,10 +38,11 @@ import {
   ValidateCreatePreannotation,
   ValidateCreateReview,
 } from "../../shared/utils/validation";
+import { useSnackbar } from "../../shared/context/SnackbarContext";
 
 const CreateProject = () => {
   const navigate = useNavigate();
-  const { step } = useParams();
+  const { dispatch: snackbarDispatch } = useSnackbar();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [stepValidation, setStepValidation] = useState({
@@ -86,26 +83,32 @@ const CreateProject = () => {
     details: {
       component: <Details values={values} updateValue={updateValue} />,
       description: "Enter project details",
+      title: "Details",
+      valid: stepValidation.details,
     },
     schema: {
       component: <Schema values={values} updateValue={updateValue} />,
       description: "Build a schema for multi-task token annotation",
+      title: "Schema",
+      valid: stepValidation.schema,
     },
     upload: {
       component: <Upload values={values} updateValue={updateValue} />,
       description: "Create or upload a corpus",
+      title: "Data",
+      valid: stepValidation.upload,
     },
     preprocessing: {
       component: <Preprocessing values={values} updateValue={updateValue} />,
       description: "Apply text preprocessing to your corpus",
+      title: "Preprocessing",
+      valid: stepValidation.preprocessing,
     },
     preannotation: {
       component: <Preannotation values={values} updateValue={updateValue} />,
       description: "Upload data for pre-annotation",
-    },
-    review: {
-      component: <Review values={values} stepValidation={stepValidation} />,
-      description: "Review project before creation",
+      title: "Preannotation",
+      valid: stepValidation.preannotation,
     },
   };
 
@@ -155,125 +158,93 @@ const CreateProject = () => {
     console.log("payload", values);
     setIsSubmitting(true);
 
-    await axios
-      .post("/api/project/create", values)
-      .then((response) => {
-        if (response.status === 200) {
-          setIsSubmitting(false);
-          navigate("/projects");
-        }
-      })
-      .catch((error) => {
-        console.log(error);
+    try {
+      const response = await axiosInstance.post("/api/project/create", values);
+
+      if (response.status === 200) {
         setIsSubmitting(false);
+        navigate("/projects");
+      } else {
+        throw new Error("Failed to create project");
+      }
+    } catch (error) {
+      console.log(error);
+      snackbarDispatch({
+        type: "SHOW",
+        message: error,
+        severity: "error",
       });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <Box sx={{ display: "flex" }}>
-      <CssBaseline />
-      <Drawer
-        sx={{
-          width: DrawerWidth,
-          flexShrink: 0,
-          "& .MuiDrawer-paper": {
-            width: DrawerWidth,
-            boxSizing: "border-box",
-            marginTop: "64px",
-          },
-        }}
-        variant="permanent"
-        anchor="left"
-      >
-        <List>
-          <ListItem>
-            <ListItemIcon>
-              <ArticleIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary={"New project"}
-              secondary={`Creating new project from ${values["corpusType"]}`}
-            />
-          </ListItem>
-        </List>
-        <Divider variant="middle" />
-        <List>
-          {Object.keys(steps)
-            .filter((key) => key !== "start")
-            .map((key, index) => (
-              <ListItem key={index} disabled={stepDisabled(key)}>
-                <ListItemButton
-                  component={Link}
-                  to={`/project/new/${key}`}
-                  selected={step === key}
-                  disabled={stepDisabled(key)}
-                >
-                  <ListItemIcon
-                    sx={{ color: stepSuccessful(key) && SuccessColor }}
-                  >
-                    {stepSuccessful(key) && <CheckCircleOutlineIcon />}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={`${index + 1}. ${key}`}
-                    sx={{
-                      color: stepSuccessful(key) && SuccessColor,
-                      textTransform: "capitalize",
-                    }}
-                  />
-                </ListItemButton>
-              </ListItem>
-            ))}
-        </List>
-      </Drawer>
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          bgcolor: "background.default",
-          p: 3,
-          width: `calc(100vw - ${DrawerWidth}px)`,
-          height: "100%",
-        }}
-      >
-        <Toolbar>
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "space-between",
-              width: "100%",
-              alignItems: "center",
-            }}
-          >
-            <Stack>
-              <Typography variant="h5" sx={{ textTransform: "capitalize" }}>
-                {step}
-              </Typography>
-              <Typography variant="paragraph">
-                {steps[step].description}
-              </Typography>
-            </Stack>
-            <Stack direction="row" pr={1}>
-              {step === "review" && (
-                <LoadingButton
-                  variant="contained"
-                  loadingPosition="start"
-                  startIcon={<AddBoxIcon />}
-                  disabled={!stepValidation["review"]}
-                  onClick={handleSubmit}
-                  loading={isSubmitting}
-                >
-                  {isSubmitting ? "Creating" : "Create"}
-                </LoadingButton>
-              )}
-            </Stack>
-          </Box>
-        </Toolbar>
-        <Divider />
-        <Grid item container spacing={4} p={4} justifyContent="center">
-          {steps[step].component}
+    <Grid container spacing={2} mt={4}>
+      {Object.values(steps).map((s) => (
+        <Grid item xs={12}>
+          <StepContainer title={s.title} valid={s.valid}>
+            {s.component}
+          </StepContainer>
         </Grid>
+      ))}
+      <Box
+        p={2}
+        margin="auto"
+        display="flex"
+        flexDirection="column"
+        alignItems="center"
+      >
+        <Typography variant="body2" gutterBottom>
+          Project creation may take a few minutes if a lot of data has been
+          uploaded
+        </Typography>
+        <LoadingButton
+          variant="contained"
+          loading={isSubmitting}
+          onClick={handleSubmit}
+          disabled={!stepValidation.review}
+        >
+          Create Project
+        </LoadingButton>
       </Box>
-    </Box>
+    </Grid>
+  );
+};
+
+const StepContainer = ({ title, valid, children }) => {
+  return (
+    <Paper
+      elevation={0}
+      variant="outlined"
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+      }}
+    >
+      <Box>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          alignItems="center"
+          mr={1}
+        >
+          <Typography variant="h6" sx={{ p: 2, color: "text.secondary" }}>
+            {title}
+          </Typography>
+          <Chip
+            label={valid ? "Input valid" : "Input required"}
+            color={valid ? "success" : "warning"}
+            variant="outlined"
+            icon={valid ? <DoneIcon /> : <WarningIcon />}
+          />
+        </Box>
+        <Divider flexItem />
+      </Box>
+      <Box p={2}>{children}</Box>
+      <Box sx={{ backgroundColor: "background.accent", height: 32 }} />
+    </Paper>
   );
 };
 
