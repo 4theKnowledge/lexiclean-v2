@@ -16,11 +16,12 @@ const ProjectSchema = mongoose.Schema(
       type: String,
       required: false,
     },
+    parallelCorpus: { type: Boolean, required: true },
     preprocessing: {
-      lower_case: { type: Boolean, required: false },
-      remove_duplicates: { type: Boolean, required: false },
-      digits_iv: { type: Boolean, required: false },
-      chars_removed: { type: String, required: false },
+      removeLowerCase: { type: Boolean, required: false },
+      removeDuplicates: { type: Boolean, required: false },
+      removeChars: { type: String, required: false },
+      digitsIV: { type: Boolean, required: false },
     },
     texts: [
       {
@@ -36,9 +37,17 @@ const ProjectSchema = mongoose.Schema(
         required: true,
       },
     ],
+    tags: [
+      {
+        name: { type: String, required: true },
+        color: { type: String, required: true },
+      },
+    ],
+    specialTokens: [{ type: String, required: false }], // Used for parellel corpus to treat as IV (without adding to En lexicon)
     metrics: {
-      starting_vocab_size: { type: Number, default: 0 },
-      starting_oov_token_count: { type: Number, default: 0 },
+      startVocabSize: { type: Number, default: 0 },
+      startCandidateVocabSize: { type: Number, default: 0 }, // OOV tokens
+      startTokenCount: { type: Number, default: 0 },
     },
   },
   { _id: true, timestamps: true }

@@ -3,6 +3,8 @@ const router = express.Router();
 const logger = require("../logger");
 const Token = require("../models/Token");
 const Text = require("../models/Text");
+const Resource = require("../models/Resource");
+const { formatTextOutput } = require("../utils/text");
 
 router.patch("/add", async (req, res) => {
   try {
@@ -83,7 +85,10 @@ router.patch("/add", async (req, res) => {
         },
         { upsert: true }
       );
-      res.json(response);
+      res.json({
+        matches: 1,
+        textTokenIds: { [req.body.textId]: [req.body.tokenId] },
+      });
     }
   } catch (error) {
     res.json({ details: error });
@@ -165,7 +170,10 @@ router.patch("/delete", async (req, res) => {
           suggestion: null,
         }
       );
-      res.json(response);
+      res.json({
+        matches: 1,
+        textTokenIds: { [req.body.textId]: [req.body.tokenId] },
+      });
     }
   } catch (err) {
     res.json({ message: err });
@@ -222,47 +230,224 @@ router.patch("/accept", async (req, res) => {
       token.suggestion = null;
       token.save();
 
-      res.json(token);
+      res.json({
+        matches: 1,
+        textTokenIds: { [req.body.textId]: [req.body.tokenId] },
+      });
     }
   } catch (error) {
     res.json({ details: error });
   }
 });
 
-// --- Token Classification Tags ---
+router.patch("/split", async (req, res) => {
+  /**
+   * Splits a given token into `n` new tokens based on introduced whitespace.
+   * TODO: Investigate how to classify tokens as IV/OOV without long load time of English lexicon.
+   */
+  try {
+    console.log(req.body);
 
-router.patch("/meta/add/single/", async (req, res) => {
-  // Patch meta-tag on one token
-  // Takes in field, value pair where the field is the axuiliary information key
+    let text = await Text.findById({ _id: req.body.textId });
+
+    const tokenIndex = req.body.tokenIndex;
+
+    // const enMap = await Resource.findOne({ type: "en" }).lean();
+    // const enMapSet = new Set(enMap.tokens);
+
+    // console.log("enMap token size", enMap.tokens.length);
+
+    // Here all historical information will be stripped from new tokens, however they will be
+    // checked for if they are OOV
+    const newTokenList = req.body.currentValue.split(" ").map((token) => ({
+      value: token,
+      active: true,
+      tags: { en: false }, // enMapSet.has(token)
+      replacement: null,
+      suggestion: null,
+      projectId: text.projectId,
+      textId: text._id,
+    }));
+
+    // console.log("new tokens", newTokenList);
+
+    // Save new tokens to db
+    const tokenListRes = await Token.insertMany(newTokenList);
+
+    // Delete old tokens (TODO: investigate whether soft delete is better)
+    await Token.findByIdAndDelete({ _id: req.body.tokenId });
+
+    // Update old and new token indexes
+    const tokensToAdd = tokenListRes.map((token, index) => ({
+      token: token._id,
+      index: tokenIndex + index, // give new tokens index which is offset by the original tokens index
+    }));
+
+    // Insert new tokens - NOTE: this happens in place on the text object.
+    text.tokens.splice(tokenIndex, 1, ...tokensToAdd);
+
+    // Reassign indexes based on current ordering
+    text.tokens = text.tokens.map((token, newIndex) => ({
+      ...token,
+      index: newIndex,
+    }));
+
+    // Update text
+    // text.save();
+
+    await Text.findByIdAndUpdate(
+      { _id: req.body.textId },
+      { tokens: text.tokens },
+      {
+        new: true,
+      }
+    );
+
+    text = await Text.findById({ _id: req.body.textId })
+      .populate("tokens.token")
+      .lean();
+
+    res.json(formatTextOutput(text));
+  } catch (error) {
+    console.log(`Error occurred when splitting token - ${error}`);
+    res.json({ details: error });
+  }
+});
+
+router.patch("/remove", async (req, res) => {
+  /**
+   * Removes a given token from a text
+   * TODO: Handle when only one token on text. Don't let user delete it, replace token content with empty string.
+   */
+  try {
+    if (req.body.applyAll) {
+      const focusToken = await Token.findById({ _id: req.body.tokenId }).lean();
+
+      const matchedTokens = await Token.find({
+        projectId: focusToken.projectId,
+        value: focusToken.value,
+      }).lean();
+
+      console.log("matchedTokens", matchedTokens);
+
+      const matchedTextIds = matchedTokens.map((t) => t.textId);
+
+      let texts = await Text.find({
+        _id: { $in: matchedTextIds },
+        $or: [
+          {
+            saved: false, // Exclude user saved texts
+            _id: focusToken.textId,
+          },
+        ],
+      }).populate("tokens.token");
+
+      let savedTextIds = texts.map((t) => t._id.toString());
+
+      console.log("savedTextIds", savedTextIds);
+
+      texts.forEach((text) => {
+        text.tokens = text.tokens
+          .filter((t) => t.token.value !== focusToken.value)
+          .map((t, index) => ({ index: index, token: t.token }));
+
+        text.save();
+      });
+
+      // NOTE: textTokenObjects here are not equivalent to textTokenIds!
+      // Only returns current page of texts
+      res.json({
+        matches: matchedTokens.filter((t) =>
+          savedTextIds.includes(t.textId.toString())
+        ).length,
+        textTokenObjects: Object.assign(
+          {},
+          ...texts
+            .filter((text) => req.body.textIds.includes(text._id.toString()))
+            .map((text) => formatTextOutput(text))
+        ),
+      });
+    } else {
+      let text = await Text.findById({ _id: req.body.textId }).populate(
+        "tokens.token"
+      );
+
+      // console.log("text", text);
+      // console.log("text tokens before mod", text.tokens.length);
+
+      // reindex remaining tokens
+      text.tokens = text.tokens
+        .filter((t) => t.token._id != req.body.tokenId)
+        .map((t, index) => ({ index: index, token: t.token }));
+
+      // console.log("text tokens after mod", text.tokens.length);
+      // console.log("text tokens", text.tokens);
+
+      // Update text
+      text.save();
+
+      // Delete old tokens (TODO: investigate whether soft delete is better)
+      await Token.findByIdAndDelete({ _id: req.body.tokenId });
+
+      res.json({ matches: 1, textTokenObjects: formatTextOutput(text) });
+    }
+  } catch (error) {
+    res.json({ details: error });
+  }
+});
+
+router.post("/search", async (req, res) => {
+  /**
+   * Searches tokens to find matches on some value.
+   * NOTE: Currently limited to replacement matches
+   */
+  try {
+    const matchedTokens = await Token.find(
+      {
+        projectId: req.body.projectId,
+        value: req.body.value,
+        replacement: { $ne: null },
+      },
+      { replacement: 1, _id: 0 }
+    ).lean();
+
+    // Get counts of replacements
+    const output = matchedTokens
+      .map((t) => t.replacement)
+      .reduce(function (acc, curr) {
+        return acc[curr] ? ++acc[curr] : (acc[curr] = 1), acc;
+      }, {});
+
+    res.json({ replacements: output });
+  } catch (error) {
+    console.log(`Error ${error}`);
+    res.json({ details: error });
+  }
+});
+
+// --- Tags for Token Classification Multi-task ---
+
+router.patch("/meta/add/single", async (req, res) => {
+  // Patch tag on one token
   try {
     const tokenResponse = await Token.findById({
       _id: req.body.tokenId,
     }).lean();
 
-    const updatedMetaTags = {
+    const updatedTags = {
       ...tokenResponse.tags,
-      [req.body.field]: req.body.value,
+      [req.body.entityLabelId]: true,
     };
 
-    const updatedReponse = await Token.findByIdAndUpdate(
+    await Token.findByIdAndUpdate(
       { _id: req.body.tokenId },
       {
-        tags: updatedMetaTags,
-        // last_modified: new Date(Date.now()),
+        tags: updatedTags,
       },
       { upsert: true }
     ).lean();
 
-    await Text.updateOne(
-      { _id: req.body.textId },
-      {
-        saved: true,
-        // last_modified: new Date(Date.now())
-      },
-      { upsert: true }
-    );
-
-    res.json(updatedReponse);
+    res.json(updatedTags);
   } catch (err) {
     res.json({ message: err });
   }
@@ -305,26 +490,31 @@ router.patch("/meta/add/many/:projectId", async (req, res) => {
 
 // Removes meta-tag from one token
 router.patch("/meta/remove/one/:tokenId", async (req, res) => {
-  //console.log('removing meta-tag from single token')
   try {
     const tokenResponse = await Token.findById({
       _id: req.params.tokenId,
     }).lean();
-    const updatedMetaTags = {
-      ...tokenResponse.tags,
-      [req.body.field]: false,
-    };
-    const response = await Token.findByIdAndUpdate(
+
+    // Filter out the key to be removed.
+    const filteredTags = Object.keys(tokenResponse.tags)
+      .filter((key) => key !== req.body.entityLabelId)
+      .reduce((res, key) => {
+        res[key] = tokenResponse.tags[key];
+        return res;
+      }, {});
+
+    await Token.findByIdAndUpdate(
       { _id: req.params.tokenId },
       {
-        tags: updatedMetaTags,
-        // last_modified: new Date(Date.now()),
+        tags: filteredTags,
       },
       { upsert: true }
     ).lean();
-    res.json(response);
-  } catch (err) {
-    res.json({ message: err });
+
+    res.json(filteredTags);
+  } catch (error) {
+    console.log(error);
+    res.json({ message: error });
   }
 });
 

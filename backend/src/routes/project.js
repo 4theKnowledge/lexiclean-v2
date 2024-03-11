@@ -7,9 +7,13 @@ const Resource = require("../models/Resource");
 const Text = require("../models/Text");
 const Token = require("../models/Token");
 const projectUtils = require("../utils/project");
-const User = require("../models/User");
 const project = require("../utils/project");
-const { createTokens } = require("../services/project");
+const { createAnnotatedTokens } = require("../services/project");
+const { normaliseSpecialTokens } = require("../utils/project");
+const {
+  getReplacementFrequencies,
+  formatOutputTexts,
+} = require("../utils/download");
 
 const REPLACEMENT_COLOR = "#03a9f4";
 
@@ -19,37 +23,62 @@ router.post("/create", async (req, res) => {
     const userId = tokenGetUserId(req.headers["authorization"]);
 
     const isParallelCorpusProject = req.body.corpusType === "parallel";
+    const tags = req.body.tags;
+    console.log("tags: ", tags);
 
     let mapSets = {};
     const enMap = await Resource.findOne({ type: "en" }).lean();
+    console.log(`loaded en map with ${enMap.tokens.length} tokens`);
     mapSets["en"] = new Set(enMap.tokens);
+
+    let specialTokens = req.body.specialTokens.trim();
+    if (specialTokens) {
+      // Add special tokens to en map set
+      specialTokens = normaliseSpecialTokens(specialTokens);
+      specialTokens.forEach((st) => mapSets["en"].add(st));
+    } else {
+      console.log("No special tokens provided or special tokens are empty.");
+    }
+
+    // replacementDictionary
 
     const rpMap = await Resource.create({
       type: "rp",
       replacements: req.body.replacementDictionary,
       color: REPLACEMENT_COLOR,
     });
+    console.log("rpMap", rpMap);
 
     /**
      * Load English lexicon (map shared for all projects) and
      * create map sets used for pre-annotation of tokens
      */
 
-    console.log("rpMap", rpMap);
-
-    const mapResponse = await Resource.insertMany(req.body.tags);
+    const mapResponse = await Resource.insertMany(
+      tags.map((t) => ({ ...t, type: t.name }))
+    );
     // const rpMap = mapResponse.filter((map) => map.type === "rp")[0]; // this should always be present in the maps
 
-    // console.log("mapResponse", mapResponse);
+    console.log("mapResponse: ", mapResponse);
 
     // Convert maps to Sets
     if (0 < mapResponse.length) {
-      mapSets = Object.assign(
-        ...mapResponse.map((map) => ({ [map.type]: new Set(map.tokens) }))
-      ); // TODO: include construction of rp map instead of doing separately. use ternary.
+      // mapSets = Object.assign(
+      //   ...mapResponse.map((map) => ({ [map.type]: new Set(map.tokens) }))
+      // ); // TODO: include construction of rp map instead of doing separately. use ternary.
+
+      const newMapSets = mapResponse.reduce((acc, map) => {
+        // acc[map.type] = new Set(map.tokens);
+        acc[map._id] = new Set(map.tokens);
+        return acc;
+      }, {});
+
+      // Merge newMapSets with existing mapSets, preserving the 'en' map set
+      mapSets = { ...mapSets, ...newMapSets };
     }
 
     // console.log("mapSets", mapSets);
+    logger.info("[CREATE PROJECT] resources created");
 
     // Create object from array of replacement tokens
     // (this is done as Mongo cannot store keys with . or $ tokens)
@@ -60,8 +89,9 @@ router.post("/create", async (req, res) => {
           {}
         );
 
-    console.log("rpObj", rpObj);
+    // console.log("rpObj", rpObj);
     mapSets["rp"] = new Set(Object.keys(rpObj));
+
     console.log("mapSets", Object.keys(mapSets));
 
     // Create base project
@@ -84,11 +114,20 @@ router.post("/create", async (req, res) => {
           ? false
           : req.body.preprocessRemoveChars,
       },
-      maps: mapResponse.map((map) => map._id),
+      maps: [...mapResponse.map((map) => map._id), rpMap._id],
+      tags: req.body.tags.map((t) => ({ name: t.name, color: t.color })),
     });
+
+    if (specialTokens) {
+      // Add special tokens array to project
+      project.specialTokens = specialTokens;
+    }
+
     project.save();
 
-    console.log("base project created:", project);
+    logger.info("[CREATE PROJECT] base project created");
+
+    // console.log("base project created:", project);
 
     let textObjs;
     let texts;
@@ -120,10 +159,10 @@ router.post("/create", async (req, res) => {
         textObjs.map((obj) => ({ ...obj, projectId: project._id }))
       );
 
-      console.log("texts", texts);
+      // console.log("texts", texts);
 
       allTokens = texts.flatMap((text) => {
-        return createTokens(
+        return createAnnotatedTokens(
           project._id,
           text._id,
           text.original.split(" "),
@@ -133,7 +172,7 @@ router.post("/create", async (req, res) => {
         );
       });
 
-      console.log("allTokens", allTokens);
+      // console.log("allTokens", allTokens);
     } else {
       // Process texts they are an Object {id:text}. For users who did not select texts with ids, the id is a placeholder.
       const normalisedTexts = Object.assign(
@@ -151,7 +190,7 @@ router.post("/create", async (req, res) => {
         })
       );
 
-      console.log("normalisedTexts", normalisedTexts);
+      // console.log("normalisedTexts", normalisedTexts);
 
       // Duplication removal
       const filteredTexts = projectUtils.removeDuplicates(
@@ -175,7 +214,7 @@ router.post("/create", async (req, res) => {
       );
 
       allTokens = texts.flatMap((text) => {
-        return createTokens(
+        return createAnnotatedTokens(
           project._id,
           text._id,
           text.original.split(" "),
@@ -188,14 +227,16 @@ router.post("/create", async (req, res) => {
 
     const allTokensRes = await Token.insertMany(allTokens);
 
-    console.log("allTokensRes", allTokensRes);
+    logger.info("[CREATE PROJECT] text and tokens added to database");
+
+    // console.log("allTokensRes", allTokensRes);
 
     // Add texts and metrics to project
     project.texts = texts.map((text) => text._id);
 
     const textTokens = texts.flatMap((text) => text.original.split(" "));
     project.metrics.startTokenCount = textTokens.length;
-    project.metrics.startVocabSize = new Set(allTokens).size;
+    project.metrics.startVocabSize = new Set(textTokens).size;
 
     const candidateTokens = allTokensRes
       .filter(
@@ -207,21 +248,42 @@ router.post("/create", async (req, res) => {
     project.metrics.startCandidateVocabSize = candidateTokens.length;
     project.save();
 
-    console.log("project with metrics", project);
+    logger.info("[CREATE PROJECT] base metrics added to project");
+
+    // console.log("project with metrics", project);
 
     // Update texts with tokens
+    // First create a map over tokens
+    const textTokenIds = allTokensRes.reduce((value, object) => {
+      if (value[object.textId]) {
+        value[object.textId].push({
+          index: object.index,
+          token: object._id.toString(),
+        });
+      } else {
+        value[object.textId] = [
+          { index: object.index, token: object._id.toString() },
+        ];
+      }
+      return value;
+    }, {});
+
+    // console.log("textTokenIds", textTokenIds);
     const textUpdateObjs = texts.flatMap((text) => ({
       updateOne: {
         filter: { _id: text._id },
         update: {
-          tokens: allTokensRes
-            .filter((token) => token.textId === text._id)
-            .map((token) => ({ index: token.index, token: token._id })),
+          tokens: textTokenIds[text._id],
+          // allTokensRes
+          //   .filter((token) => token.textId === text._id)
+          //   .map((token) => ({ index: token.index, token: token._id })),
         },
         options: { new: true },
       },
     }));
     await Text.bulkWrite(textUpdateObjs);
+
+    logger.info("[CREATE PROJECT] tokens added to texts");
 
     /**
      * Calculate mean, masked, TF-IDF for each text
@@ -232,8 +294,10 @@ router.post("/create", async (req, res) => {
     // - 3. compute filtered text average tf-idf score/weight
     const tfidfs = projectUtils.calculateTFIDF(texts); // Token tf-idfs
 
+    logger.info("[CREATE PROJECT] calculated inverse TF-IDF scores");
+
     const candidateTokensUnique = new Set(candidateTokens);
-    console.log("candidateTokensUnique", candidateTokensUnique);
+    // console.log("candidateTokensUnique", candidateTokensUnique);
 
     // Fetch texts and populate tokens (they aren't returned from the bulkInsert); TODO: Find better method.
     texts = await Text.find({ projectId: project._id })
@@ -273,6 +337,9 @@ router.post("/create", async (req, res) => {
       },
     }));
     await Text.bulkWrite(weightedTextUpdateObjs);
+
+    logger.info("[CREATE PROJECT] weighted and ranked texts");
+
     res.json({ details: "Project created successfully." });
   } catch (error) {
     logger.error("Failed to create project", { route: "/api/project/create" });
@@ -330,10 +397,11 @@ router.get("/feed", async (req, res) => {
             )
             .map((token) => token.value).length;
 
-          console.log(project);
+          // console.log(project);
 
           return {
             _id: project._id,
+            isParallelCorpusProject: project.parallelCorpus,
             name: project.name,
             description: project.description,
             startCandidateVocabSize: project.metrics.startCandidateVocabSize,
@@ -371,9 +439,15 @@ router.patch("/", async (req, res) => {
   try {
     logger.info("Updating single project", { route: "/api/project/" });
     const userId = tokenGetUserId(req.headers["authorization"]);
+
+    // Create an object for the fields to update
+    const updateFields = {};
+    if (req.body.name) updateFields.name = req.body.name;
+    if (req.body.description) updateFields.description = req.body.description;
+
     const updatedProject = await Project.updateOne(
       { _id: req.body.projectId, user: userId },
-      { $set: { title: req.body.title } }
+      { $set: updateFields }
     );
     res.json(updatedProject);
   } catch (err) {
@@ -388,14 +462,25 @@ router.get("/:projectId", async (req, res) => {
       route: `/api/project/${req.params.projectId}`,
     });
     const userId = tokenGetUserId(req.headers["authorization"]);
-    const response = await Project.findOne(
+    const project = await Project.findOne(
       {
         _id: req.params.projectId,
         user: userId,
       },
       { texts: 0 }
     ).lean();
-    res.json(response);
+
+    if (!project) {
+      res.status(404).json({ message: "Project not found" });
+      return;
+    }
+
+    const schemaMap = project.tags.reduce((acc, { _id, name, color }) => {
+      acc[_id] = { name, color };
+      return acc;
+    }, {});
+
+    res.json({ ...project, schemaMap });
   } catch (err) {
     res.json({ message: err });
     logger.error("Failed to fetch single project", {
@@ -432,68 +517,23 @@ router.delete("/:projectId", async (req, res) => {
   }
 });
 
-// Get count of tokens and saved text for a single project
-router.get("/counts/:projectId", async (req, res) => {
-  // utils.authenicateToken,
+router.get("/progress/:projectId", async (req, res) => {
   try {
-    logger.info("Get project token counts", {
-      route: `/api/project/counts/${req.params.projectId}`,
+    const totalTexts = await Text.count({ projectId: req.params.projectId });
+    const savedTexts = await Text.count({
+      projectId: req.params.projectId,
+      saved: true,
     });
-    const textRes = await Text.find({ projectId: req.params.projectId })
-      .populate("tokens.token")
-      .lean();
-
-    const uniqueTokens = new Set(
-      textRes
-        .map((text) =>
-          text.tokens.map((token) =>
-            token.token.replacement
-              ? token.token.replacement
-              : token.token.value
-          )
-        )
-        .flat()
-    );
-
-    // Unlike on project creation, the other meta-tags need to be checked such as removed, noise, etc.
-    const allTokens = textRes
-      .map((text) => text.tokens.map((token) => token.token))
-      .flat();
-    const candidateTokens = allTokens
-      .filter(
-        (token) =>
-          Object.values(token.tags).filter((tagBool) => tagBool).length === 0 &&
-          !token.replacement
-      )
-      .map((token) => token.value);
-    logger.info("vocab counts", {
-      vocab_size: uniqueTokens.size,
-      candidateTokens: candidateTokens.length,
-    });
-
-    // Get saved text counts
-    logger.info("Getting project text annotation progress", {
-      route: `/api/project/counts/${req.params.projectId}`,
-    });
-    const textsSaved = textRes.filter((text) => text.saved).length;
-    const textsTotal = textRes.length;
-    logger.info("annotation progress", { text_saved: textsSaved });
 
     res.json({
-      token: {
-        vocab_size: uniqueTokens.size,
-        oov_tokens: candidateTokens.length,
-      },
-      text: {
-        saved: textsSaved,
-        total: textsTotal,
+      progress: {
+        value: Math.round((savedTexts / totalTexts) * 100),
+        title: `${savedTexts}/${totalTexts}`,
       },
     });
-  } catch (err) {
-    res.json({ message: err });
-    logger.error("Failed to get project token counts", {
-      route: `/api/project/counts/${req.params.projectId}`,
-    });
+  } catch (error) {
+    console.log(`Error: ${error}`);
+    res.json({ details: error });
   }
 });
 
@@ -540,9 +580,9 @@ router.get("/metrics/:projectId", async (req, res) => {
       },
       {
         description: "Vocabulary Reduction",
-        detail: `${vocabSize} / ${project.metrics.starting_vocab_size}`,
+        detail: `${vocabSize} / ${project.metrics.startVocabSize}`,
         value: `${Math.round(
-          (1 - vocabSize / project.metrics.starting_vocab_size) * 100
+          (1 - vocabSize / project.metrics.startVocabSize) * 100
         )}%`,
         title:
           "Comparison between of current vocabulary and starting vocabulary",
@@ -567,190 +607,135 @@ router.get("/metrics/:projectId", async (req, res) => {
   }
 });
 
-router.post("/download/result", async (req, res) => {
-  // utils.authenicateToken,
-  // Download normalisation results as seq2seq or tokenclf
+router.get("/download/:projectId", async (req, res) => {
+  /**
+   * TODO: Adapt output to accommodate token classification format - see:
+   * LexiClean v1 route https://github.com/nlp-tlp/lexiclean/blob/main/server/routes/project/download.js
+   */
   try {
     logger.info("Downloading project results", {
-      route: "/api/project/download/result",
+      route: "/api/project/download/:projectId",
     });
-    let texts;
 
-    if (req.body.preview) {
-      if (req.body.saved) {
-        texts = await Text.find({
-          projectId: req.body.projectId,
-          saved: req.body.saved,
-        })
-          .limit(10)
-          .populate("tokens.token")
-          .lean();
-      } else {
-        texts = await Text.find({ projectId: req.body.projectId })
-          .limit(10)
-          .populate("tokens.token")
-          .lean();
-      }
-    } else {
-      if (req.body.saved) {
-        texts = await Text.find({
-          projectId: req.body.projectId,
-          saved: req.body.saved,
-        })
-          .populate("tokens.token")
-          .lean();
-      } else {
-        texts = await Text.find({ projectId: req.body.projectId })
-          .populate("tokens.token")
-          .lean();
-      }
-    }
+    const project = await Project.findById(
+      {
+        _id: req.params.projectId,
+      },
+      { _id: 0, user: 0, texts: 0, maps: 0, __v: 0, updatedAt: 0 }
+    ).lean();
 
-    let count;
+    const texts = await Text.find(
+      { projectId: req.params.projectId },
+      { _id: 0, projectId: 0, weight: 0, rank: 0 }
+    )
+      .populate("tokens.token")
+      .lean();
 
-    if (req.body.saved) {
-      count = await Text.count({
-        projectId: req.body.projectId,
-        saved: req.body.saved,
-      });
-    } else {
-      count = await Text.count({ projectId: req.body.projectId });
-    }
+    // TODO: Reduce all of the tokenization histories
+    // let tokenizationHistories = response
+    //   .filter((text) => text.tokenizationHistory.length > 0)
+    //   .map((text) => {
+    //     const histObj = Object.assign(...text.tokenizationHistory);
+    //     const history = Object.keys(histObj).map((key) => ({
+    //       token: histObj[key].map((tokenInfo) => tokenInfo.info.value).join(""),
+    //       pieces: histObj[key].map((tokenInfo) => tokenInfo.info.value),
+    //     }));
+    //     return {
+    //       _id: text._id,
+    //       history: history,
+    //     };
+    //   });
 
-    if (req.body.type === "seq2seq") {
-      const results = texts.map((text) => ({
-        tid: text._id,
-        identifiers: text.identifiers,
-        input: text.original.split(" "),
-        output: text.tokens
-          .map((tokenInfo) =>
-            tokenInfo.token.replacement
-              ? tokenInfo.token.replacement.split(" ")
-              : tokenInfo.token.value
-          )
-          .flat(),
-        class: text.tokens
-          .map((tokenInfo, index) => {
-            if (
-              tokenInfo.token.replacement &&
-              tokenInfo.token.replacement.split(" ").length > 1
-            ) {
-              const tokenCount = tokenInfo.token.replacement.split(" ").length;
-
-              return Array(tokenCount).fill(text.tokens[index].token.tags);
-            } else {
-              return tokenInfo.token.tags;
-            }
-          })
-          .flat(),
-      }));
-
-      res.json({ results: results, count: count });
-    } else if (req.body.type === "tokenclf") {
-      // Use tokenization history to format output as n:n
-      const results = texts.map((text) => {
-        const tokenizationHist = text.tokenization_hist;
-        if (tokenizationHist.length > 0) {
-          const oTextTokenLen = text.original.split(" ").length;
-          const tokenizationHistObj = Object.assign(...tokenizationHist);
-          let output = text.tokens.map((tokenInfo, index) => {
-            return tokenInfo.token.replacement
-              ? tokenInfo.token.replacement
-              : tokenInfo.token.value;
-          });
-          let metaTags = text.tokens.map((tokenInfo) => tokenInfo.token.tags);
-          // Add white space (and empty metaTags)
-          Object.keys(tokenizationHistObj)
-            .slice()
-            .reverse()
-            .map((val) => {
-              const numWS = tokenizationHistObj[val].length - 1;
-              // add white space
-              const indexWS = tokenizationHistObj[val][1].index;
-              const ws = Array(numWS).fill(" ");
-              // add empty meta tag dicts
-              const mtDicts = Array(numWS).fill({});
-              if (indexWS > output.length - 1) {
-                // minus 1 to account for 0 indexing
-                // Extend array (ws at the end)
-                output = [...output, ...ws];
-                metaTags = [...metaTags, ...mtDicts];
-              } else {
-                // Otherwise insert
-                output.splice(indexWS, 0, ...ws);
-                metaTags.splice(indexWS, 0, ...mtDicts);
-              }
-            });
-          return {
-            tid: text._id,
-            identifiers: text.identifiers,
-            input: text.original.split(" "),
-            output: output,
-            class: metaTags,
-          };
-        }
-
-        return {
-          tid: text._id,
-          input: text.original.split(" "),
-          output: text.tokens.map((tokenInfo) =>
-            tokenInfo.token.replacement
-              ? tokenInfo.token.replacement
-              : tokenInfo.token.value
-          ),
-          class: text.tokens.map((tokenInfo) => tokenInfo.token.tags),
-        };
-      });
-      res.json({ results: results, count: count });
-    } else {
-      // Error invalid type...
-      res.sendStatus(500);
-    }
-  } catch (err) {
-    res.json({ message: err });
-    logger.error("Failed to download project results", {
-      route: "/api/project/download/result",
+    res.json({
+      metadata: { ...project, totalTexts: texts.length },
+      texts: formatOutputTexts(texts),
+      resources: {},
+      tokenizations: [], //tokenizationHistories
+      replacements: getReplacementFrequencies(texts),
     });
+  } catch (error) {
+    console.log(`Error: ${error}`);
+    res.json({ details: error });
   }
 });
 
-// Download tokenization history across project
-router.post(
-  "/download/tokenizations",
+router.get("/summary/:projectId", async (req, res) => {
+  const userId = tokenGetUserId(req.headers["authorization"]);
+  const [project] = await Project.find({
+    _id: req.params.projectId,
+    user: userId,
+  }).lean();
 
-  async (req, res) => {
-    // utils.authenicateToken,
-    try {
-      const response = await Text.find({ projectId: req.body.projectId })
-        .populate("tokens.token")
-        .lean();
+  const savedTexts = await Text.count({
+    projectId: req.params.projectId,
+    saved: true,
+  });
 
-      // Reduce all of the tokenization histories
-      let tHist = response
-        .filter((text) => text.tokenization_hist.length > 0)
-        .map((text) => {
-          const histObj = Object.assign(...text.tokenization_hist);
-          const history = Object.keys(histObj).map((key) => ({
-            token: histObj[key]
-              .map((tokenInfo) => tokenInfo.info.value)
-              .join(""),
-            pieces: histObj[key].map((tokenInfo) => tokenInfo.info.value),
-          }));
-          return {
-            _id: text._id,
-            history: history,
-          };
-        });
+  const currTokens = await Token.find({
+    projectId: req.params.projectId,
+  }).lean();
 
-      if (req.body.preview) {
-        tHist = tHist.slice(0, 10);
-      }
+  const currVocab = new Set(
+    currTokens
+      .map((token) => (token.replacement ? token.replacement : token.value))
+      .flat()
+  ).size;
 
-      res.json(tHist);
-    } catch (err) {
-      res.json({ message: err });
-    }
-  }
-);
+  const currentOOVTokens = currTokens
+    .filter(
+      (token) =>
+        Object.values(token.tags).filter((tagBool) => tagBool).length === 0 &&
+        !token.replacement
+    )
+    .map((token) => token.value).length;
+
+  const texts = await Text.find(
+    { projectId: req.params.projectId },
+    { _id: 0, projectId: 0, weight: 0, rank: 0 }
+  )
+    .populate("tokens.token")
+    .lean();
+
+  res.json({
+    details: {
+      _id: req.params.projectId,
+      name: project.name,
+      description: project.description,
+      parallelCorpus: project.parallelCorpus,
+      specialTokens: project.specialTokens,
+      createdAt: project.createdAt,
+      preprocessing: project.preprocessing,
+      tags: project.tags,
+    },
+    metrics: [
+      { name: "Project Texts", value: project.texts.length },
+      { name: "Saved Texts", value: savedTexts },
+      {
+        name: "Progress",
+        value: Math.round((savedTexts / project.texts.length) * 100),
+      },
+      {
+        name: "Starting Vocabulary Size",
+        value: project.metrics.startVocabSize,
+      },
+      { name: "Current Vocabulary Size", value: currVocab },
+      {
+        name: "Vocabulary Reduction",
+        value: Math.round(
+          ((project.metrics.startVocabSize - currVocab) /
+            project.metrics.startVocabSize) *
+            100
+        ),
+      },
+      { name: "Starting Token Count", value: project.metrics.startTokenCount },
+      { name: "Current Token Count", value: currTokens.length },
+      { name: "Corrections Made", value: currentOOVTokens },
+    ],
+    lists: {
+      mostFrequentWords: {},
+      mostFrequentReplacements: getReplacementFrequencies(texts, 50),
+    },
+  });
+});
 
 module.exports = router;

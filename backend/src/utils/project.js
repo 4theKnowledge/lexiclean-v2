@@ -120,7 +120,16 @@ module.exports = {
     //   "- Calculated tf-idf weights"
     // );
 
-    logger.info(tfidfs);
+    // logger.info(tfidfs);
     return tfidfs;
+  },
+  normaliseSpecialTokens: (specialTokens) => {
+    /**
+     * Splits a string of comma-separated special tokens into a list of special tokens
+     */
+    return specialTokens
+      .split(",")
+      .map((i) => i.trim())
+      .filter((n) => n); // remove empty items (e.g. if trailing , on input)
   },
 };

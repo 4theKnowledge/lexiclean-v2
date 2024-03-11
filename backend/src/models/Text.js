@@ -1,13 +1,9 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
-const aggregatePaginate = require("mongoose-aggregate-paginate-v2");
 
-const TextSchema = mongoose.Schema(
+const TextSchema = new mongoose.Schema(
   {
-    // Project id is here as its required when filtering texts with mongoose paginate aggregator. Otherwise a list of
-    // doc_ids would need to be queried from the project collection every pagination event.
-    // required is false as the project_id isn't available before texts are populated.
-    project_id: {
+    projectId: {
       type: Schema.Types.ObjectId,
       ref: "Project",
       required: false,
@@ -15,6 +11,11 @@ const TextSchema = mongoose.Schema(
     original: {
       type: String,
       required: true,
+    },
+    // Reference is used when uploading parallel corpora for error correction.
+    reference: {
+      type: String,
+      required: false,
     },
     tokens: [
       {
@@ -34,12 +35,12 @@ const TextSchema = mongoose.Schema(
       type: Number,
       required: false,
     },
-    annotated: {
+    saved: {
       type: Boolean,
       required: false,
       default: false,
     },
-    tokenization_hist: [],
+    tokenizationHistory: [{ type: Schema.Types.Mixed, required: false }],
     rank: {
       type: Number,
     },
@@ -48,5 +49,4 @@ const TextSchema = mongoose.Schema(
   { _id: true, timestamps: true }
 );
 
-TextSchema.plugin(aggregatePaginate);
 module.exports = mongoose.model("Text", TextSchema);

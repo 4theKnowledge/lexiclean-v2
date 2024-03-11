@@ -7,7 +7,7 @@ const TokenSchema = mongoose.Schema(
       type: String,
       required: true,
     },
-    meta_tags: {
+    tags: {
       type: Schema.Types.Mixed,
       required: false,
     },
@@ -21,12 +21,12 @@ const TokenSchema = mongoose.Schema(
       required: true,
       default: true,
     },
-    suggested_replacement: {
+    suggestion: {
       type: String,
       required: false,
       default: null,
     },
-    project_id: {
+    projectId: {
       type: Schema.Types.ObjectId,
       ref: "Project",
       required: false,
