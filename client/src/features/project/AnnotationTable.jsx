@@ -2,7 +2,7 @@ import { useState, useContext } from "react";
 import { Grid, Stack, Skeleton } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { TextContainer } from "./TextContainer";
-import { ProjectContext } from "../../shared/context/project-context";
+import { ProjectContext } from "../../shared/context/ProjectContext";
 
 const AnnotationTable = () => {
   const [state, dispatch] = useContext(ProjectContext);
@@ -65,7 +65,7 @@ const AnnotationTable = () => {
             key={id}
           />
         ))}
-      {!state.textsLoading && Object.keys(state.texts).length == 0 && (
+      {!state.textsLoading && Object.keys(state.texts).length === 0 && (
         <div
           style={{
             marginTop: "25vh",

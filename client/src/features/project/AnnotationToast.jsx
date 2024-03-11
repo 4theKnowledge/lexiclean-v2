@@ -24,7 +24,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import RestoreIcon from "@mui/icons-material/Restore";
 import UndoIcon from "@mui/icons-material/Undo";
 
-import { ProjectContext } from "../../shared/context/project-context";
+import { ProjectContext } from "../../shared/context/ProjectContext";
 import { StrikeColor } from "../../shared/constants/project";
 
 const AnnotationToast = () => {
