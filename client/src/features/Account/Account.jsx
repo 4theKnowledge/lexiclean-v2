@@ -2,21 +2,21 @@ import React, { useEffect, useState } from "react";
 import StyledCard from "../Dashboard/StyledCard";
 import { Box, Stack, TextField } from "@mui/material";
 import { useAppContext } from "../../shared/context/AppContext";
-import axiosInstance from "../../shared/api/axiosInstance";
-import { useSnackbar } from "../../shared/context/SnackbarContext";
 import LoadingButton from "@mui/lab/LoadingButton";
+import useUserActions from "../../shared/hooks/api/user";
 
 const Account = () => {
-  const { state, dispatch } = useAppContext(); // Assuming state includes user information
+  const { state } = useAppContext();
   const [name, setName] = useState(state.user?.name || "");
   const [username, setUsername] = useState(state.user?.username || "");
   const [email, setEmail] = useState(state.user?.email || "");
   const [openAIKey, setOpenAIKey] = useState(state.user?.openAIKey || "");
-  const { dispatch: snackbarDispatch } = useSnackbar();
 
   // Track if any changes have been made to enable the Update button
   const [isChanged, setIsChanged] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const { updateUserDetails } = useUserActions();
 
   useEffect(() => {
     setName(state.user?.name || "");
@@ -35,37 +35,9 @@ const Account = () => {
   const handleUpdate = async () => {
     try {
       setIsSubmitting(true);
-      const payload = { name, openAIKey };
-      const response = await axiosInstance.patch(
-        `/api/user/${state.user._id}`,
-        payload
-      );
-
-      // Check if the status code is in the 2xx range
-      if (response.status < 200 || response.status >= 300) {
-        throw new Error(
-          response.data.message || "Unable to update account details."
-        );
-      }
-
-      // Assuming your API returns the updated user object
-      dispatch({
-        type: "SET_USER",
-        payload: response.data, // Directly use the updated user data from the response if possible
-      });
-
-      snackbarDispatch({
-        type: "SHOW",
-        message: "Successfully updated account details.",
-        severity: "success",
-      });
+      await updateUserDetails({ name, openAIKey });
     } catch (error) {
       console.error(error);
-      snackbarDispatch({
-        type: "SHOW",
-        message: error.response?.data?.message || error.message,
-        severity: "error",
-      });
     } finally {
       setIsSubmitting(false);
     }
