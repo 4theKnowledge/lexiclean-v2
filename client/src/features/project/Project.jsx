@@ -1,24 +1,46 @@
 import { useState, useEffect, useContext } from "react";
 import { useLocation, useParams, useNavigate } from "react-router-dom";
 import { Box, CssBaseline, Container } from "@mui/material";
-import { ProjectContext } from "../../shared/context/project-context";
+import { ProjectContext } from "../../shared/context/ProjectContext";
 import Sidebar from "./sidebar/Sidebar";
 import AnnotationTable from "./AnnotationTable";
 import Paginator from "./Paginator";
 import ProjectAppBar from "./AppBar";
+import useProjectActions from "../../shared/hooks/api/project";
 
 const Project = () => {
   const navigate = useNavigate();
   const { projectId } = useParams();
   const [state, dispatch] = useContext(ProjectContext);
-
+  const { getProjectProgress, getProject, getTexts } = useProjectActions();
+  const [loading, setLoading] = useState(true);
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const [page, setPage] = useState(searchParams.get("page") || "1");
 
   useEffect(() => {
-    dispatch({ type: "SET_PROJECTID", payload: projectId });
+    // Load project
+    const initProject = async () => {
+      if (loading) {
+        await getProjectProgress({ projectId });
+        await getProject({ projectId });
+        await getTexts({
+          projectId,
+          filters: state.filters,
+          page: page,
+          limit: state.pageLimit,
+        });
+        setLoading(false);
+      }
+    };
+
+    initProject();
   }, [projectId]);
+
+  useEffect(() => {
+    // If projectId changes, reload data.
+    setLoading(false);
+  }, [projectId, state.pageLimit]);
 
   useEffect(() => {
     // Check if 'page' parameter is not present or is explicitly the empty string

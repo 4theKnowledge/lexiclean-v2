@@ -1,7 +1,6 @@
 import { useContext, useState, useEffect } from "react";
 import { Stack, IconButton, Typography, Divider, Tooltip } from "@mui/material";
 import { teal, red, orange, grey } from "@mui/material/colors";
-// import { useAuth0 } from "@auth0/auth0-react";
 import DeleteIcon from "@mui/icons-material/Delete";
 import DeleteSweep from "@mui/icons-material/DeleteSweep";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -13,20 +12,12 @@ import ContentCutIcon from "@mui/icons-material/ContentCut";
 import UndoIcon from "@mui/icons-material/Undo";
 import RestoreIcon from "@mui/icons-material/Restore";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
-import { ProjectContext } from "../../shared/context/project-context";
-import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
+import { ProjectContext } from "../../shared/context/ProjectContext";
+import { useNavigate } from "react-router-dom";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { useSnackbar } from "../../shared/context/SnackbarContext";
-
-import {
-  acceptTokenAction,
-  applyTokenAction,
-  deleteTokenAction,
-  removeTokenAction,
-  splitTokenAction,
-} from "../../shared/api/project";
 import { useTheme } from "@mui/material/styles";
+import useAnnotationActions from "../../shared/hooks/api/annotation";
 
 const EditPopover = (props) => {
   const {
@@ -46,188 +37,82 @@ const EditPopover = (props) => {
   const [showExtraOptions, setShowExtraOptions] = useState(false);
   const [quickFilterApplied, setQuickFilterApplied] = useState(false);
   const theme = useTheme();
-  const { dispatch: snackbarDispatch } = useSnackbar();
+  const {
+    applyTokenTransformAction,
+    deleteTokenTransformAction,
+    acceptTokenTransformAction,
+    splitTokenAction,
+    removeTokenAction,
+  } = useAnnotationActions();
 
   const handleApplyAction = async (applyAll) => {
-    const payload = {
-      tokenId: tokenId,
-      textId: textId,
-      replacement: currentValue,
-      applyAll: applyAll,
-      suggestion: false,
-      textIds: Object.keys(state.texts),
-    };
-
     try {
-      const response = await applyTokenAction(payload);
-      if (response.status === 200) {
-        dispatch({
-          type: "TOKEN_APPLY",
-          payload: {
-            ...payload,
-            ...response.data,
-            tokenIndex: tokenIndex,
-            originalValue: originalValue,
-          },
-        });
-        setAnchorEl(null);
-        snackbarDispatch({
-          type: "SHOW",
-          message: `Updated '${originalValue}' to '${currentValue}' ${response.data.matches} times`,
-          severity: "success",
-        });
-      }
-    } catch (error) {
-      snackbarDispatch({
-        type: "SHOW",
-        message: `Error occurred applying token replacement ${error}`,
-        severity: "error",
+      await applyTokenTransformAction({
+        tokenId,
+        textId,
+        replacement: currentValue,
+        applyAll,
+        suggestion: false,
+        textIds: Object.keys(state.texts),
+        tokenIndex,
+        originalValue,
+        currentValue,
       });
+    } finally {
+      setAnchorEl(null);
     }
   };
 
   const handleDeleteAction = async (applyAll) => {
-    const payload = {
-      tokenId: tokenId,
-      applyAll: applyAll,
-      textId: textId,
-      textIds: Object.keys(state.texts),
-    };
-
     try {
-      const response = await deleteTokenAction(payload);
-      if (response.status === 200) {
-        dispatch({
-          type: "TOKEN_DELETE",
-          payload: {
-            ...payload,
-            ...response.data,
-            tokenIndex: tokenIndex,
-            originalValue: originalValue,
-            currentValue: currentValue,
-          },
-        });
-        setAnchorEl(null);
-        snackbarDispatch({
-          type: "SHOW",
-          message: `Deleted '${originalValue}' (and similar ${
-            applyAll ? "in all texts" : "occurrence"
-          }) successfully.`,
-          severity: "success",
-        });
-      }
-    } catch (error) {
-      snackbarDispatch({
-        type: "SHOW",
-        message: `Error occurred deleting token: ${error}`,
-        severity: "error",
+      await deleteTokenTransformAction({
+        tokenId,
+        applyAll,
+        textId,
+        textIds: Object.keys(state.texts),
+        tokenIndex,
+        originalValue,
+        currentValue,
       });
+    } finally {
+      setAnchorEl(null);
     }
   };
 
   const handleAcceptAction = async (applyAll) => {
-    const payload = {
-      tokenId: tokenId,
-      textId: textId,
-      applyAll: applyAll,
-      textIds: Object.keys(state.texts),
-    };
-
     try {
-      const response = await acceptTokenAction(payload);
-      if (response.status === 200) {
-        dispatch({
-          type: "TOKEN_ACCEPT",
-          payload: {
-            ...payload,
-            ...response.data,
-            tokenIndex: tokenIndex,
-            originalValue: originalValue,
-            currentValue: currentValue,
-          },
-        });
-        setAnchorEl(null);
-        const successMessage = applyAll
-          ? `Token '${originalValue}' accepted for all instances successfully.`
-          : `Token '${originalValue}' accepted for the current instance successfully.`;
-
-        snackbarDispatch({
-          type: "SHOW",
-          message: successMessage,
-          severity: "success",
-        });
-      }
-    } catch (error) {
-      snackbarDispatch({
-        type: "SHOW",
-        message: `Error occurred accepting token: ${error}`,
-        severity: "error",
+      await acceptTokenTransformAction({
+        tokenId,
+        textId,
+        applyAll,
+        textIds: Object.keys(state.texts),
+        tokenIndex,
+        originalValue,
+        currentValue,
       });
+    } finally {
+      setAnchorEl(null);
     }
   };
 
-  const handleSplitAction = async () => {
-    const payload = {
-      textId: textId,
-      tokenId: tokenId,
-      tokenIndex: tokenIndex,
-      currentValue: currentValue,
-      // applyAll: applyAll  // TODO
-    };
-    try {
-      const response = await splitTokenAction(payload);
-
-      if (response.status === 200) {
-        dispatch({ type: "TOKEN_SPLIT", payload: response.data });
-        snackbarDispatch({
-          type: "SHOW",
-          message: "Token split successfully.",
-          severity: "success",
-        });
-      }
-    } catch (error) {
-      snackbarDispatch({
-        type: "SHOW",
-        message: `Error splitting token: ${error}`,
-        severity: "error",
-      });
-    }
+  const handleSplitAction = async (applyAll = false) => {
+    await splitTokenAction({
+      textId,
+      tokenId,
+      tokenIndex,
+      currentValue,
+      applyAll,
+    });
   };
 
   const handleRemoveTokenAction = async (applyAll) => {
-    const payload = {
-      textId: textId,
-      tokenId: tokenId,
-      applyAll: applyAll,
+    await removeTokenAction({
+      textId,
+      tokenId,
+      applyAll,
       textIds: Object.keys(state.texts),
-    };
-
-    try {
-      const response = removeTokenAction(payload);
-      if (response.status === 200) {
-        dispatch({
-          type: "TOKEN_REMOVE",
-          payload: {
-            ...payload,
-            ...response.data,
-            originalValue: originalValue,
-          },
-        });
-        snackbarDispatch({
-          type: "SHOW",
-          message: `Permanently removed token ${originalValue} ${
-            applyAll ? "in all texts" : "occurrence"
-          }`,
-          severity: "success",
-        });
-      }
-    } catch (error) {
-      snackbarDispatch({
-        type: "SHOW",
-        message: `Erorr deleting token(s): ${error}`,
-        severity: "error",
-      });
-    }
+      originalValue,
+    });
   };
 
   const handleRemoveTokenCase = () => {
@@ -373,11 +258,11 @@ const EditPopover = (props) => {
         {showExtraOptions || !showOperations ? (
           <>
             {showOperations && <Divider orientation="vertical" />}
-            <Tooltip title="Click to perform a quick filter on this token">
+            {/* <Tooltip title="Click to perform a quick filter on this token">
               <IconButton size="small" onClick={handleQuickFilter}>
                 <FilterListIcon size="small" sx={{ fontSize: "1rem" }} />
               </IconButton>
-            </Tooltip>
+            </Tooltip> */}
             {showSplitTokenOperation && (
               <Tooltip title="Click to split token">
                 <IconButton size="small" onClick={handleSplitAction}>
@@ -403,14 +288,14 @@ const EditPopover = (props) => {
                 <DeleteIcon size="small" sx={{ fontSize: "1rem" }} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Click to remove this token from the corpus">
+            {/* <Tooltip title="Click to remove this token from the corpus">
               <IconButton
                 size="small"
                 onClick={() => handleRemoveTokenAction(true)}
               >
                 <DeleteSweep size="small" sx={{ fontSize: "1rem" }} />
               </IconButton>
-            </Tooltip>
+            </Tooltip> */}
           </>
         ) : (
           <Tooltip title="Click to show more options">
