@@ -1,29 +1,19 @@
 import { useEffect, useState } from "react";
-import axiosInstance from "../../shared/api/axiosInstance";
-import {
-  Grid,
-  Button,
-  Typography,
-  Stack,
-  CircularProgress,
-  Box,
-  Paper,
-} from "@mui/material";
-import { Link, useNavigate } from "react-router-dom";
+import { Grid, Button, CircularProgress, Box } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import ProjectCard from "./ProjectCard";
+import useProjectActions from "../../shared/hooks/api/project";
 
 const Projects = () => {
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState();
+  const { fetchProjects: fetchProjectsAction } = useProjectActions();
 
   useEffect(() => {
     const fetchProjects = async () => {
-      const response = await axiosInstance.get("/api/project/feed");
-
-      if (response.status === 200) {
-        setProjects(response.data);
-        setLoading(false);
-      }
+      const data = await fetchProjectsAction();
+      setProjects(data);
+      setLoading(false);
     };
 
     if (loading) {
@@ -41,7 +31,13 @@ const Projects = () => {
         <Grid container direction="row" columnSpacing={4} rowSpacing={4} p={4}>
           <CreateProjectCard />
           {projects.map((project, index) => {
-            return <ProjectCard index={index} project={project} />;
+            return (
+              <ProjectCard
+                key={`project-card-${project._id}`}
+                index={index}
+                project={project}
+              />
+            );
           })}
         </Grid>
       )}
