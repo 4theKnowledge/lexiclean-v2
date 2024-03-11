@@ -1,34 +1,12 @@
 import { useState, useEffect } from "react";
-import axiosInstance from "../../shared/api/axiosInstance";
-import {
-  Grid,
-  Typography,
-  Box,
-  Divider,
-  Paper,
-  Chip,
-  Button,
-} from "@mui/material";
+import { Grid, Typography, Box, Divider, Paper, Chip } from "@mui/material";
 import LoadingButton from "@mui/lab/LoadingButton";
-
 import Details from "./steps/Details";
 import Upload from "./steps/upload/Upload";
 import Preprocessing from "./steps/Preprocessing";
 import Schema from "./steps/Schema";
 import Labelling from "./steps/Labelling";
-import Review from "./steps/Review";
 import Preannotation from "./steps/Preannotation";
-
-import { useNavigate } from "react-router-dom";
-
-import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import ArticleIcon from "@mui/icons-material/Article";
-import AddBoxIcon from "@mui/icons-material/AddBox";
-
-import { useParams, Link } from "react-router-dom";
-import { SuccessColor } from "../../shared/constants/create";
-import { DrawerWidth } from "../../shared/constants/layout";
-
 import DoneIcon from "@mui/icons-material/Done";
 import WarningIcon from "@mui/icons-material/Warning";
 import {
@@ -38,11 +16,10 @@ import {
   ValidateCreatePreannotation,
   ValidateCreateReview,
 } from "../../shared/utils/validation";
-import { useSnackbar } from "../../shared/context/SnackbarContext";
+import useProjectActions from "../../shared/hooks/api/project";
 
 const CreateProject = () => {
-  const navigate = useNavigate();
-  const { dispatch: snackbarDispatch } = useSnackbar();
+  const { createProject } = useProjectActions();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [stepValidation, setStepValidation] = useState({
@@ -155,25 +132,10 @@ const CreateProject = () => {
   }, [values]);
 
   const handleSubmit = async () => {
-    console.log("payload", values);
-    setIsSubmitting(true);
-
     try {
-      const response = await axiosInstance.post("/api/project/create", values);
-
-      if (response.status === 200) {
-        setIsSubmitting(false);
-        navigate("/projects");
-      } else {
-        throw new Error("Failed to create project");
-      }
-    } catch (error) {
-      console.log(error);
-      snackbarDispatch({
-        type: "SHOW",
-        message: error,
-        severity: "error",
-      });
+      console.log("payload", values);
+      setIsSubmitting(true);
+      await createProject(values);
     } finally {
       setIsSubmitting(false);
     }
