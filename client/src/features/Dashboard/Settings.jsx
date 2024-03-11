@@ -71,6 +71,7 @@ const Settings = ({ loading, data, downloadProject, deleteProject }) => {
               value={deleteName}
               size="small"
               color="error"
+              fullWidth
             />
             <Button
               variant="contained"
