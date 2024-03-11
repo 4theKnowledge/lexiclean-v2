@@ -1,12 +1,20 @@
 import { useState, useContext, useEffect } from "react";
-import axios from "axios";
-import { Grid, Stack, Box, Typography, Button, Paper } from "@mui/material";
+import {
+  Grid,
+  Stack,
+  Box,
+  Typography,
+  Button,
+  Paper,
+  Tooltip,
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { grey, green, yellow } from "@mui/material/colors";
+import { grey, green, yellow, teal, orange } from "@mui/material/colors";
 import { Text } from "./Text";
-import { ProjectContext } from "../../shared/context/project-context";
+import { ProjectContext } from "../../shared/context/ProjectContext";
 import { getTokenWidth } from "../../shared/utils/token";
 import ActionTray from "./ActionTray";
+import useAnnotationActions from "../../shared/hooks/api/annotation";
 
 export const TextContainer = (props) => {
   const { text, textId, textIndex } = props;
@@ -61,8 +69,7 @@ export const TextContainer = (props) => {
 };
 
 const TokenizedText = ({ textId, tokens }) => {
-  const [state, dispatch] = useContext(ProjectContext);
-
+  const { tokenizeTokensAction } = useAnnotationActions();
   const [valid, setValid] = useState(false);
   const [tokenIndexes, setTokenIndexes] = useState(new Set());
   const [tokenIndexGroups, setTokenIndexGroups] = useState([]);
@@ -104,19 +111,11 @@ const TokenizedText = ({ textId, tokens }) => {
   };
 
   const handleTokenize = async () => {
-    axios
-      .patch("/api/text/tokenize", {
-        textId: textId,
-        indexGroupsTC: tokenIndexGroups,
-      })
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({ type: "TOKENIZE", payload: response.data });
-        }
-      })
-      .catch((error) => console.log(`Error: ${error}`));
-
-    handleReset();
+    try {
+      await tokenizeTokensAction({ textId, tokenIndexGroups });
+    } finally {
+      handleReset();
+    }
   };
 
   return (
@@ -128,16 +127,14 @@ const TokenizedText = ({ textId, tokens }) => {
         {tokens &&
           Object.keys(tokens).map((tokenIndex) => {
             const token = tokens[tokenIndex];
-            const color = tokenIndexes.has(parseInt(tokenIndex))
-              ? green[500]
-              : yellow[500];
+            const color = tokenIndexes.has(parseInt(tokenIndex)) && teal[200];
             const width = getTokenWidth(token.currentValue);
 
             return (
               <Typography
                 sx={{
                   textAlign: "center",
-                  backgroundColor: alpha(color, 0.75),
+                  backgroundColor: color && alpha(color, 0.75),
                   width: width,
                 }}
                 onClick={() => handleIndex(parseInt(tokenIndex))}
@@ -148,22 +145,26 @@ const TokenizedText = ({ textId, tokens }) => {
           })}
       </Box>
       <Stack direction="row" mt={2} spacing={2}>
-        <Button
-          size="small"
-          disabled={tokenIndexes.size <= 1 || !valid}
-          onClick={handleTokenize}
-          variant="outlined"
-        >
-          Apply
-        </Button>
-        <Button
-          size="small"
-          disabled={tokenIndexes.size === 0}
-          onClick={handleReset}
-          variant="outlined"
-        >
-          Clear
-        </Button>
+        <Tooltip title="Click to tokenize">
+          <Button
+            size="small"
+            disabled={tokenIndexes.size <= 1 || !valid}
+            onClick={handleTokenize}
+            variant="outlined"
+          >
+            Apply
+          </Button>
+        </Tooltip>
+        <Tooltip title="Click to clear selection">
+          <Button
+            size="small"
+            disabled={tokenIndexes.size === 0}
+            onClick={handleReset}
+            variant="outlined"
+          >
+            Clear
+          </Button>
+        </Tooltip>
       </Stack>
     </Box>
   );
