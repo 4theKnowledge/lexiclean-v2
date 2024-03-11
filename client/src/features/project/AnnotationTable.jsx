@@ -3,10 +3,10 @@ import { Grid, Stack, Skeleton } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import { TextContainer } from "./TextContainer";
 import { ProjectContext } from "../../shared/context/project-context";
-// import { useAuth0 } from "@auth0/auth0-react";
 
 const AnnotationTable = () => {
   const [state, dispatch] = useContext(ProjectContext);
+  // console.log("AnnotationTable state: ", state);
 
   //   const pageBeforeViewChange = useSelector(selectPageBeforeViewChange);
 
@@ -48,12 +48,11 @@ const AnnotationTable = () => {
   return (
     <Grid
       item
-      container
-      direction="column"
-      //   onKeyDown={(e) => handleMarkupKeyDownEvent(e)}
+      xs={12}
+      // onKeyDown={(e) => handleMarkupKeyDownEvent(e)}
       tabIndex="-1"
       sx={{ outline: "none" }}
-      mb={4}
+      p={2}
     >
       {!state.textsLoading &&
         state.texts &&
