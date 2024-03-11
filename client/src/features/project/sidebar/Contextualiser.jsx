@@ -1,6 +1,14 @@
 import { useContext, useEffect, useState } from "react";
-import { Typography, Grid, Stack, Chip, Box, Paper } from "@mui/material";
-import axios from "axios";
+import {
+  Typography,
+  Grid,
+  Stack,
+  Chip,
+  Box,
+  Paper,
+  Divider,
+} from "@mui/material";
+import axiosInstance from "../../../shared/api/axiosInstance";
 import { ProjectContext } from "../../../shared/context/project-context";
 
 const Contextualiser = () => {
@@ -9,7 +17,7 @@ const Contextualiser = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await axios.post("/api/token/search", {
+      const response = await axiosInstance.post("/api/token/search", {
         projectId: state.projectId,
         value: state.selectedToken.value,
       });
@@ -30,38 +38,63 @@ const Contextualiser = () => {
         flexDirection="column"
         sx={{ whiteSpace: "normal", overflowWrap: "break-word" }}
       >
-        {state.selectedToken ? (
-          <Typography>Selected: {state.selectedToken.value}</Typography>
-        ) : (
-          <Typography>Nothing Selected</Typography>
-        )}
-        {state.selectedToken && data && (
-          <>
-            <Typography variant="caption">
-              Replacements made on tokens of the same value:
-            </Typography>
-            <Stack direction="row" spacing={2} pt={1}>
-              {Object.keys(data.replacements).length === 0 ? (
-                <Chip label={"Nothing found"} size="small" />
-              ) : (
-                Object.keys(data.replacements).map((value) => (
-                  <Chip
-                    color="primary"
-                    key={`replacement-${value}-${data.replacements[value]}`}
-                    label={`${value}: ${data.replacements[value]}`}
-                    size="small"
-                  />
-                ))
+        <Typography fontWeight="bold" color="text.secondary" gutterBottom>
+          Contextualiser
+        </Typography>
+        <Divider />
+        <Box p={1}>
+          {state.selectedToken ? (
+            <Stack>
+              <Typography fontSize={12}>
+                Current Value: {state.selectedToken.currentValue}
+              </Typography>
+              {state.selectedToken.currentValue !==
+                state.selectedToken.value && (
+                <Typography fontSize={12}>
+                  Original Value: {state.selectedToken.value}
+                </Typography>
               )}
             </Stack>
-            {/* <Typography variant="caption">Similar Terms</Typography>
+          ) : (
+            <Typography variant="body2">Nothing Selected</Typography>
+          )}
+          {state.selectedToken && data && (
+            <>
+              <Typography variant="caption">
+                Replacements made on similar tokens:
+              </Typography>
+              <Stack
+                direction="row"
+                spacing={1}
+                pt={1}
+                sx={{
+                  flexWrap: "wrap",
+                  gap: 0.5,
+                  justifyContent: "flex-start",
+                }}
+              >
+                {Object.keys(data.replacements).length === 0 ? (
+                  <Chip label={"Nothing found"} size="small" />
+                ) : (
+                  Object.keys(data.replacements).map((value) => (
+                    <Chip
+                      color="primary"
+                      key={`replacement-${value}-${data.replacements[value]}`}
+                      label={`${value}: ${data.replacements[value]}`}
+                      size="small"
+                    />
+                  ))
+                )}
+              </Stack>
+              {/* <Typography variant="caption">Similar Terms</Typography>
             <Stack direction="row" spacing={2} p={1}>
               {data.similar.map((item) => (
                 <Chip key={`similar-${item}`} label={item} size="small" />
               ))}
             </Stack> */}
-          </>
-        )}
+            </>
+          )}
+        </Box>
       </Box>
     </Paper>
   );
