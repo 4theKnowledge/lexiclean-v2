@@ -2,7 +2,7 @@ import { useState, useContext } from "react";
 import { Typography, Popover, Box, Divider } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import { alpha } from "@mui/material/styles";
-import { ProjectContext } from "../../shared/context/project-context";
+import { ProjectContext } from "../../shared/context/ProjectContext";
 import TagPopover from "./TagPopover";
 import { teal } from "@mui/material/colors";
 

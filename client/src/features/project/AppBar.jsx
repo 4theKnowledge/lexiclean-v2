@@ -10,7 +10,7 @@ import {
   Chip,
 } from "@mui/material";
 import MuiAppBar from "@mui/material/AppBar";
-import { ProjectContext } from "../../shared/context/project-context";
+import { ProjectContext } from "../../shared/context/ProjectContext";
 import { styled } from "@mui/material/styles";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { ANNOTATION_SIDEBAR_WIDTH } from "../../shared/constants/layout";
@@ -51,17 +51,17 @@ const ProjectAppBar = () => {
       }}
     >
       <Toolbar sx={{ pr: "24px", color: "text.secondary" }}>
-        {!state.projectLoading && (
-          <Typography
-            component="h1"
-            variant="h6"
-            color="inherit"
-            noWrap
-            sx={{ flexGrow: 1 }}
-          >
-            {truncateText(state.project.name, 35)}
-          </Typography>
-        )}
+        <Typography
+          component="h1"
+          variant="h6"
+          color="inherit"
+          noWrap
+          sx={{ flexGrow: 1 }}
+        >
+          {state?.project?.name
+            ? truncateText(state.project.name, 35)
+            : "Loading..."}
+        </Typography>
         <Stack direction="row" spacing={2} alignItems="center">
           {/* {state.submitting && <CircularProgress size={18} />} */}
           {/* <FilterButton /> */}

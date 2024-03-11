@@ -1,7 +1,7 @@
 import { useEffect, useState, useContext } from "react";
 import { Box } from "@mui/material";
 import Token from "./Token";
-import { ProjectContext } from "../../shared/context/project-context";
+import { ProjectContext } from "../../shared/context/ProjectContext";
 
 export const Text = (props) => {
   const { text, textId } = props;

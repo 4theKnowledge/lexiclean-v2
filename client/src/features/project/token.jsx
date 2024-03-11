@@ -3,7 +3,7 @@ import { Typography, Stack, TextField, Popover } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import EditPopover from "./EditPopover";
 import { alpha } from "@mui/material/styles";
-import { ProjectContext } from "../../shared/context/project-context";
+import { ProjectContext } from "../../shared/context/ProjectContext";
 import { getTokenWidth } from "../../shared/utils/token";
 import SpanEntityAnnotation from "./SpanEntityAnnotation";
 import { useTheme } from "@mui/material/styles";
