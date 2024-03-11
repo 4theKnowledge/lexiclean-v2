@@ -5,6 +5,7 @@ import {
   Typography,
   Divider,
   CircularProgress,
+  Box,
 } from "@mui/material";
 import {
   Save as SaveIcon,
@@ -17,6 +18,8 @@ import axios from "axios";
 import JoinFullIcon from "@mui/icons-material/JoinFull";
 import { getGPTCorrection } from "../../shared/api/llm";
 import { useModal } from "../../shared/context/ModalContext";
+import { teal } from "@mui/material/colors";
+import { useAppContext } from "../../shared/context/AppContext";
 
 const getMostRecentDate = (dates) => {
   /**
@@ -49,6 +52,8 @@ const getMostRecentDate = (dates) => {
 
 const ActionTray = ({ textId, textIndex }) => {
   const [state, dispatch] = useContext(ProjectContext);
+  const { state: appState } = useAppContext();
+
   const tokenCount = Object.values(state.texts[textId].tokens).length ?? 0;
   const { openModal } = useModal();
 
@@ -88,6 +93,35 @@ const ActionTray = ({ textId, textIndex }) => {
 
   const [loadingSuggestion, setLoadingSuggestion] = useState(false);
 
+  const renderSuggestionResponse = (currentTextValue, formattedResponse) => {
+    return (
+      <>
+        <Typography gutterBottom>
+          Suggestion for input:{" "}
+          <span style={{ color: teal[900] }}>{currentTextValue}</span>
+        </Typography>
+        <Box
+          margin="auto"
+          sx={{
+            overflow: "auto",
+            backgroundColor: "#f5f5f5",
+            borderRadius: "8px",
+            padding: "16px",
+            maxHeight: 400,
+          }}
+        >
+          <Typography
+            component="pre"
+            variant="body2"
+            style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}
+          >
+            <code>{formattedResponse}</code>
+          </Typography>
+        </Box>
+      </>
+    );
+  };
+
   const handleAISuggestion = async () => {
     try {
       setLoadingSuggestion(true);
@@ -95,10 +129,25 @@ const ActionTray = ({ textId, textIndex }) => {
       const currentTextValue = Object.values(state.texts[textId].tokens)
         .map((t) => t.currentValue)
         .join(" ");
-      const response = await getGPTCorrection(currentTextValue);
-      console.log("handleAISuggestion:", response);
-      openModal(<div>{response}</div>, "AI Suggestion");
+      const response = await getGPTCorrection({
+        text: currentTextValue,
+        openAIKey: appState.user.openAIKey,
+      });
+
+      if (!response) {
+        throw new Error("No suggestion available.");
+      }
+
+      const formattedResponse = JSON.stringify(JSON.parse(response), null, 2);
+      const llmResponse = renderSuggestionResponse(
+        currentTextValue,
+        formattedResponse
+      );
+
+      openModal(llmResponse, "AI Suggestion");
     } catch (error) {
+      console.error("handleAISuggestion error:", error);
+      openModal(`Error: ${error.message}`, "AI Suggestion Error");
     } finally {
       setLoadingSuggestion(false);
     }
@@ -166,7 +215,6 @@ const ActionTray = ({ textId, textIndex }) => {
         alignItems="center"
         sx={{
           fontWeight: 500,
-          // color: theme.palette.neutral.main,
           fontSize: "0.75rem",
         }}
       >
@@ -176,11 +224,22 @@ const ActionTray = ({ textId, textIndex }) => {
           </Typography>
         </Tooltip>
         <Tooltip
-          title={`${
-            state.texts[textId].identifiers === undefined
-              ? "No external id"
-              : state.texts[textId].identifiers.join(", ")
-          }`}
+          title={
+            <Stack direction="column" spacing={1}>
+              <Typography variant="caption">
+                External ID:{" "}
+                {state.texts[textId].identifiers === undefined
+                  ? "Unavailable"
+                  : state.texts[textId].identifiers.join(", ")}
+              </Typography>
+              <Typography variant="caption">
+                Rank: {state.texts[textId].rank}
+              </Typography>
+              <Typography variant="caption">
+                Weight: {Math.round(state.texts[textId].weight * 1000) / 1000}
+              </Typography>
+            </Stack>
+          }
           arrow
           placement="top"
         >
@@ -188,7 +247,6 @@ const ActionTray = ({ textId, textIndex }) => {
             fontSize="inherit"
             sx={{
               fontWeight: 900,
-              //   color: theme.palette.primary.main,
               cursor: "help",
             }}
           >
