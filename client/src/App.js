@@ -1,9 +1,6 @@
 import React from "react";
-import { Helmet } from "react-helmet";
-import { ThemeProvider } from "@mui/material";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./App.css";
-import { appTheme } from "./theme";
 // import { AuthProvider } from "./features/auth/authcontext";
 // import { ProtectedRoute } from "./features/auth/protectedroute";
 // import { Unauthorized } from "./features/auth/unauthorized";
@@ -11,10 +8,21 @@ import Landing from "./features/landing/Landing";
 import Projects from "./features/projects/Projects";
 import CreateProject from "./features/projectcreation/CreateProject";
 import Project from "./features/project/Project";
-import history from "./features/utils/history";
 import Layout from "./shared/components/Layout";
+import Dashboard from "./features/Dashboard";
 // import Annotation from "./features/Annotation";
-import Dev from "./features/dev/Dev";
+// import Dev from "./features/dev/Dev";
+// import { Multiuser } from "./features/dev/Multiuser";
+// import ListEditor from "./features/dev/ListEditor";
+// import Grammarly from "./features/dev/Grammarly";
+
+import CustomSnackbar from "./shared/components/CustomSnackbar";
+import SnackbarProvider from "./shared/context/SnackbarContext";
+import { ThemeProvider } from "./shared/context/ThemeContext";
+import { AppProvider } from "./shared/context/AppContext";
+import ErrorPage from "./shared/components/ErrorPage";
+import { ModalProvider } from "./shared/context/ModalContext";
+import Account from "./features/Account";
 
 function App() {
   // return (
@@ -73,21 +81,36 @@ function App() {
   // );
 
   return (
-    <ThemeProvider theme={appTheme}>
-      <BrowserRouter>
-        <Routes>
-          <Route index element={<Landing />} />
-          <Route
-            path="/project/:projectId/page=:pageNumber"
-            element={<Project />}
-          />
-          {/* <Route path="/dev" element={<Dev />} /> */}
-          <Route path="/" element={<Layout />}>
-            <Route path="/projects" element={<Projects />} />
-            <Route path="/project/new/:step" element={<CreateProject />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+    <ThemeProvider>
+      <SnackbarProvider>
+        <ModalProvider>
+          <AppProvider>
+            <CustomSnackbar />
+            <BrowserRouter>
+              <Routes>
+                <Route index element={<Landing />} />
+                {/* <Route path="/dev/multiuser" element={<Multiuser />} /> */}
+                {/* <Route path="/dev/listeditor" element={<ListEditor />} /> */}
+                {/* <Route path="/dev/grammarly" element={<Grammarly />} /> */}
+                <Route path="/project/:projectId" element={<Project />} />
+                {/* <Route path="/dev" element={<Dev />} /> */}
+                <Route path="/" element={<Layout />}>
+                  <Route path="/projects" element={<Projects />} />
+                  <Route
+                    exact
+                    path="/project/create"
+                    element={<CreateProject />}
+                  />
+                  <Route path="/dashboard/:projectId" element={<Dashboard />} />
+                  <Route path="/account" element={<Account />} />
+                </Route>
+                {/* Catch-all route for undefined paths */}
+                {/* <Route path="*" element={<ErrorPage />} /> */}
+              </Routes>
+            </BrowserRouter>
+          </AppProvider>
+        </ModalProvider>
+      </SnackbarProvider>
     </ThemeProvider>
   );
 }
