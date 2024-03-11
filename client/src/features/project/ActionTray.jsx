@@ -6,87 +6,48 @@ import {
   Divider,
   CircularProgress,
   Box,
+  Menu,
+  MenuList,
+  MenuItem,
+  Badge,
 } from "@mui/material";
 import {
   Save as SaveIcon,
   AutoAwesome as AutoAwesomeIcon,
 } from "@mui/icons-material";
-import { useSearchParams } from "react-router-dom";
 import { useContext, useState } from "react";
-import { ProjectContext } from "../..//shared/context/project-context";
-import axios from "axios";
+import { ProjectContext } from "../..//shared/context/ProjectContext";
 import JoinFullIcon from "@mui/icons-material/JoinFull";
 import { getGPTCorrection } from "../../shared/api/llm";
 import { useModal } from "../../shared/context/ModalContext";
 import { teal } from "@mui/material/colors";
 import { useAppContext } from "../../shared/context/AppContext";
-
-const getMostRecentDate = (dates) => {
-  /**
-   * Takes an array of UTC date strings in the format "yyyy-mm-ddThh:mm:ss.ssssss" and returns the most recent date as a UTC Date object.
-   * @param {Array} dates - An array of UTC date strings.
-   * @returns {Date} The most recent date in UTC format.
-   */
-  // Convert each date string to a Date object and store in an array
-  const dateObjects = dates.map((dateString) => new Date(dateString));
-
-  // Use the reduce() method to find the maximum Date object in the array
-  const maxDate = dateObjects.reduce(
-    (max, date) => (date > max ? date : max),
-    new Date(0)
-  );
-
-  // Return the maximum date as a UTC Date object
-  return new Date(
-    Date.UTC(
-      maxDate.getFullYear(),
-      maxDate.getMonth(),
-      maxDate.getDate(),
-      maxDate.getHours(),
-      maxDate.getMinutes(),
-      maxDate.getSeconds(),
-      maxDate.getMilliseconds()
-    )
-  );
-};
+import useProjectActions from "../../shared/hooks/api/project";
+import FlagIcon from "@mui/icons-material/Flag";
+import { useParams } from "react-router-dom";
+import { flagOptions } from "../../shared/constants/project";
 
 const ActionTray = ({ textId, textIndex }) => {
   const [state, dispatch] = useContext(ProjectContext);
   const { state: appState } = useAppContext();
-
   const tokenCount = Object.values(state.texts[textId].tokens).length ?? 0;
   const { openModal } = useModal();
+  const { saveTexts } = useProjectActions();
+  const { projectId } = useParams();
 
   const handleSave = async (textId, saveState) => {
-    axios
-      .patch("/api/text/save", {
-        textIds: [textId],
-        saved: saveState,
-      })
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({
-            type: "SAVE_TEXTS",
-            payload: { textIds: [textId], saveState: saveState },
-          });
-        }
-      });
-
-    axios
-      .get(`/api/project/progress/${state.projectId}`)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({ type: "SET_VALUE", payload: response.data });
-        }
-      })
-      .catch((error) => console.log(`Error: ${error}`));
+    await saveTexts({
+      projectId: projectId,
+      textIds: [textId],
+      isSaved: saveState,
+    });
   };
 
   const handleTokenizeText = () => {
     dispatch({
       type: "SET_VALUE",
       payload: {
-        tokenizeTextId: state.tokenizeTextId == textId ? null : textId,
+        tokenizeTextId: state.tokenizeTextId === textId ? null : textId,
       },
     });
   };
@@ -193,6 +154,7 @@ const ActionTray = ({ textId, textIndex }) => {
             }
           />
         </Tooltip>
+        <TrayChip />
         <Divider orientation="vertical" flexItem />
         <Chip
           clickable
@@ -255,6 +217,85 @@ const ActionTray = ({ textId, textIndex }) => {
         </Tooltip>
       </Stack>
     </Stack>
+  );
+};
+
+const TrayChip = () => {
+  const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
+  const handleOpen = (event) => {
+    setAnchorEl(event.currentTarget);
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  return (
+    <>
+      <Tooltip title="Click to modify flag(s) on this text" placement="top">
+        <Badge
+          // badgeContent={state.texts[textId].flags.length}
+          max={9}
+          color="primary"
+        >
+          <Chip
+            clickable
+            label="Flags"
+            size="small"
+            icon={<FlagIcon />}
+            // color={state.tokenizeTextId === textId ? "primary" : "default"}
+            variant={"outlined"}
+            onClick={handleOpen}
+            disabled
+            // disabled={
+            //   state.tokenizeTextId !== null && state.tokenizeTextId !== textId
+            // }
+          />
+        </Badge>
+      </Tooltip>
+      <Menu
+        id="flag-menu"
+        anchorEl={anchorEl}
+        open={open}
+        onClose={handleClose}
+        transformOrigin={{ horizontal: "right", vertical: "top" }}
+        anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
+      >
+        <MenuList dense>
+          {flagOptions.map((option, index) => (
+            <FlagMenuItem
+              // state={state}
+              // textId={textId}
+              option={option}
+              // onClick={handleClick}
+              index={index}
+            />
+          ))}
+        </MenuList>
+      </Menu>
+    </>
+  );
+};
+
+const FlagMenuItem = ({ state, textId, option, onClick, index }) => {
+  // const hasFlag =
+  //   state.texts[textId].flags.filter((f) => f.state === option).length === 1;
+
+  return (
+    <Tooltip
+      // title={`Click to ${hasFlag ? "remove" : "apply"} ${option} flag`}
+      placement="right"
+    >
+      <MenuItem
+        // onClick={onClick}
+        sx={{ textTransform: "capitalize" }}
+        // value={index}
+        // selected={hasFlag}
+      >
+        {option}
+      </MenuItem>
+    </Tooltip>
   );
 };
 
