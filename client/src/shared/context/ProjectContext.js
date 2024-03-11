@@ -1,7 +1,5 @@
 import * as React from "react";
 import { updateTexts } from "../utils/project-context";
-import { getProgress, getProject, getTexts } from "../api/project";
-import { useCallback } from "react";
 
 const updateTagsById = (data, targetId, newTags) => {
   // Create a new object to avoid mutating the original data
@@ -59,7 +57,7 @@ const reducer = (state, action) => {
     case "SET_PROJECT": {
       // Sets textsLoading to ensure documents are loaded correctly.
       return {
-        ...initialState,
+        ...state,
         projectId: state.projectId,
         project: action.payload,
         projectLoading: false,
@@ -225,39 +223,6 @@ const reducer = (state, action) => {
 
 export const ProjectProvider = ({ children }) => {
   const [state, dispatch] = React.useReducer(reducer, initialState);
-
-  const getProjectDetailsCallback = useCallback(() => {
-    if (!state.projectId) return;
-    getProgress(state.projectId, dispatch);
-    getProject(state.projectId, dispatch);
-  }, [state.projectId, dispatch]);
-
-  const getTextsCallback = useCallback(() => {
-    if (!state.textsLoading || !state.projectId) return;
-
-    getTexts(
-      state.projectId,
-      state.filters,
-      state.pageNumber,
-      state.pageLimit,
-      dispatch
-    );
-  }, [
-    state.textsLoading,
-    state.projectId,
-    // state.filters,
-    // state.pageNumber,
-    // state.pageLimit,
-    dispatch,
-  ]);
-
-  React.useEffect(() => {
-    getProjectDetailsCallback();
-  }, [getProjectDetailsCallback]);
-
-  React.useEffect(() => {
-    getTextsCallback();
-  }, [getTextsCallback]);
 
   return (
     <ProjectContext.Provider value={[state, dispatch]}>
