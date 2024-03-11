@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { TablePagination, Skeleton } from "@mui/material";
+import { TablePagination, Skeleton, Box } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { ProjectContext } from "../../shared/context/project-context";
 
@@ -9,7 +9,9 @@ const Paginator = () => {
 
   const handleChangePage = (event, newPage) => {
     dispatch({ type: "SET_PAGE", payload: newPage + 1 });
-    navigate(`/project/${state.projectId}/page=${newPage + 1}`);
+    navigate(`/project/${state.projectId}?page=${newPage + 1}`, {
+      replace: true,
+    });
   };
 
   const handleChangeRowsPerPage = (event) => {
@@ -24,22 +26,28 @@ const Paginator = () => {
     }
   };
 
-  if (!state.totalTexts) {
-    return <Skeleton variant="rectangular" width={300} height={40} />;
-  } else {
-    return (
-      // Note: component indexes from 0
-      <TablePagination
-        component="div"
-        count={state.totalTexts}
-        page={state.pageNumber - 1}
-        onPageChange={handleChangePage}
-        rowsPerPage={state.pageLimit}
-        rowsPerPageOptions={[1, 2, 5, 10, 20]}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-      />
-    );
-  }
+  return (
+    <Box
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      width="100%"
+    >
+      {!state.totalTexts ? (
+        <Skeleton variant="rectangular" width={300} height={40} />
+      ) : (
+        <TablePagination
+          component="div"
+          count={state.totalTexts ?? 0}
+          page={state.pageNumber - 1}
+          onPageChange={handleChangePage}
+          rowsPerPage={state.pageLimit}
+          rowsPerPageOptions={[1, 2, 5, 10, 20]}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
+      )}
+    </Box>
+  );
 };
 
 export default Paginator;

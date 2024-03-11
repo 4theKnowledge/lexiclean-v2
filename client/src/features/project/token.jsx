@@ -1,12 +1,12 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { Typography, Stack, TextField, Popover } from "@mui/material";
 import { styled } from "@mui/material/styles";
-import { grey, blue, orange } from "@mui/material/colors";
 import EditPopover from "./EditPopover";
 import { alpha } from "@mui/material/styles";
-import { EditColor } from "../../shared/constants/project";
 import { ProjectContext } from "../../shared/context/project-context";
 import { getTokenWidth } from "../../shared/utils/token";
+import SpanEntityAnnotation from "./SpanEntityAnnotation";
+import { useTheme } from "@mui/material/styles";
 
 export const TokenInputComponent = styled(TextField)((props) => ({
   textAlign: "center",
@@ -27,31 +27,22 @@ export const SpanComponent = styled(Typography)((props) => ({
   },
 }));
 
-const Token = ({
-  textId,
-  token,
-  tokenIndex,
-  currentlySelected,
-  selectedTokens,
-}) => {
+const Token = ({ textId, token, tokenIndex }) => {
   const hasReplacement = token.replacement;
   const hasSuggestion = token.suggestion;
   const isOutOfVocab = !token.tags.en;
   const [editing, setEditing] = useState(false);
-
+  const tokenRef = useRef(null);
   const [state, dispatch] = useContext(ProjectContext);
-
-  // NOTE: Token is selected is for entity annotation mode and contextualisation
-  const tokenIsSelected =
-    currentlySelected || selectedTokens.tokenIds?.includes(token._id);
-
+  const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState(null);
+  const open = Boolean(anchorEl);
 
-  const handlePopoverOpen = (event) => {
+  const handlePrimaryPopoverOpen = (event) => {
     setAnchorEl(event.currentTarget);
   };
 
-  const handlePopoverClose = () => {
+  const handlePrimaryPopoverClose = () => {
     setAnchorEl(null);
     dispatch({
       type: "UPDATE_TOKEN_VALUE",
@@ -67,18 +58,13 @@ const Token = ({
     });
   };
 
-  const open = Boolean(anchorEl);
-
   const handleTokenEdit = (e, newToken) => {
     dispatch({
       type: "UPDATE_TOKEN_VALUE",
       payload: { textId: textId, tokenIndex: tokenIndex, newValue: newToken },
     });
-
-    // console.log(token.currentValue, newToken);
-
     if (token.currentValue !== newToken) {
-      handlePopoverOpen(e);
+      handlePrimaryPopoverOpen(e);
     }
   };
 
@@ -96,21 +82,37 @@ const Token = ({
     }
   }, [token.currentValue]);
 
-  // const tokenHasSpan = editing || hasReplacement || hasSuggestion;
-  const tokenColor = alpha(
-    editing || hasReplacement
-      ? EditColor
-      : hasSuggestion
-      ? blue[500]
-      : isOutOfVocab
-      ? orange[500]
-      : grey[700],
-    state.tokenizeTextId === null
+  const tokenHasSpan = editing || hasReplacement || hasSuggestion;
+
+  const getBaseColor = () => {
+    if (editing) return theme.palette.token.editing;
+    if (hasReplacement) return theme.palette.token.replacement;
+    if (hasSuggestion) return theme.palette.token.suggestion;
+    if (isOutOfVocab) return theme.palette.token.oov;
+    return theme.palette.text.secondary;
+  };
+
+  const getOpacity = () => {
+    return state.tokenizeTextId === null || state.tokenizeTextId === textId
       ? 1
-      : state.tokenizeTextId === textId
-      ? 1
-      : 0.25
-  );
+      : 0.25;
+  };
+
+  const tokenColor = alpha(getBaseColor(), getOpacity());
+
+  const handleTokenSelect = (tokenId) => {
+    if (state.selectedToken && state.selectedToken._id === tokenId) {
+      dispatch({
+        type: "SET_VALUE",
+        payload: { selectedToken: null, selectedTextId: null },
+      });
+    } else {
+      dispatch({
+        type: "SET_VALUE",
+        payload: { selectedToken: token, selectedTextId: textId },
+      });
+    }
+  };
 
   return (
     <Stack
@@ -120,6 +122,7 @@ const Token = ({
       tokenindex={tokenIndex}
     >
       <TokenInputComponent
+        ref={tokenRef}
         variant="standard"
         tokenindex={tokenIndex}
         key={token._id}
@@ -131,20 +134,43 @@ const Token = ({
             textAlign: "center",
             width: getTokenWidth(token.currentValue),
             color: tokenColor,
+            backgroundColor:
+              state.selectedToken &&
+              state.selectedToken._id === token._id &&
+              alpha(tokenColor, 0.1),
+            borderRadius: 4,
           },
         }}
         InputProps={{
           disableUnderline: true,
         }}
         title={`value: ${token.value} | replacement: ${token.replacement} | suggestion: ${token.suggestion}`}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          handlePrimaryPopoverOpen(e);
+        }}
+        contextMenu="none"
+        onClick={() => handleTokenSelect(token._id)}
       />
-      {tokenIsSelected && (
+      {tokenHasSpan && (
         <SpanComponent
           color={tokenColor}
-          onClick={(e) => handlePopoverOpen(e)}
+          onClick={(e) => handlePrimaryPopoverOpen(e)}
           title="Click to modify"
         />
       )}
+      <Stack direction="column" mt={0.25}>
+        {Object.entries(token.tags)
+          .filter(([labelId, active]) => labelId !== "en" && active)
+          .map(([labelId]) => (
+            <SpanEntityAnnotation
+              key={`${token._id}-${labelId}`}
+              tokenId={token._id}
+              labelId={labelId}
+              textId={textId}
+            />
+          ))}
+      </Stack>
       <Popover
         id="edit-span-popover"
         open={open}
@@ -157,7 +183,7 @@ const Token = ({
           vertical: "top",
           horizontal: "left",
         }}
-        onClose={handlePopoverClose}
+        onClose={handlePrimaryPopoverClose}
         disableRestoreFocus
         disableAutoFocus={true}
         disableEnforceFocus={true}
@@ -174,7 +200,7 @@ const Token = ({
           textId={textId}
           tokenId={token._id}
           tokenIndex={tokenIndex}
-          handlePopoverClose={handlePopoverClose}
+          handlePopoverClose={handlePrimaryPopoverClose}
           setAnchorEl={setAnchorEl}
           originalValue={token.value}
           currentValue={token.currentValue}
