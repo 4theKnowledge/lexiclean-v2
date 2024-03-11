@@ -10,6 +10,7 @@ import {
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
+import { truncateText } from "../../utils/general";
 
 const UserDetail = ({ drawerOpen = true, handleDrawerToggle }) => {
   const { state } = useAppContext();
@@ -39,20 +40,25 @@ const UserDetail = ({ drawerOpen = true, handleDrawerToggle }) => {
           <>
             <UserAvatar />
             <Stack>
-              <Typography
-                variant="subtitle"
-                color="text.secondary"
-                fontWeight={500}
-              >
-                {state.user.name}
-              </Typography>
-              <Typography
-                variant="subtitle"
-                color="text.secondary"
-                fontSize={12}
-              >
-                {state.user.email}
-              </Typography>
+              <Tooltip title={state.user.name}>
+                <Typography
+                  variant="subtitle"
+                  color="text.secondary"
+                  fontWeight={500}
+                >
+                  {truncateText(state.user.name, 25)}
+                </Typography>
+              </Tooltip>
+              <Tooltip title={state.user.email}>
+                <Typography
+                  variant="subtitle"
+                  color="text.secondary"
+                  fontSize={12}
+                  sx={{ cursor: "help" }}
+                >
+                  {truncateText(state.user.email, 25)}
+                </Typography>
+              </Tooltip>
             </Stack>
             <Tooltip title="Click to view account settings">
               <IconButton onClick={() => navigate("/account")}>
