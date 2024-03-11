@@ -8,21 +8,22 @@ import {
   Paper,
   Divider,
 } from "@mui/material";
-import axiosInstance from "../../../shared/api/axiosInstance";
-import { ProjectContext } from "../../../shared/context/project-context";
+import { ProjectContext } from "../../../shared/context/ProjectContext";
+import useMiscActions from "../../../shared/hooks/api/misc";
 
 const Contextualiser = () => {
   const [state, dispatch] = useContext(ProjectContext);
   const [data, setData] = useState();
+  const { getTokenContext } = useMiscActions();
 
   useEffect(() => {
     const fetchData = async () => {
-      const response = await axiosInstance.post("/api/token/search", {
+      const data = await getTokenContext({
         projectId: state.projectId,
-        value: state.selectedToken.value,
+        tokenValue: state.selectedToken.value,
       });
 
-      setData(response.data);
+      setData(data);
     };
 
     if (state.selectedToken && state.selectedToken.value) {

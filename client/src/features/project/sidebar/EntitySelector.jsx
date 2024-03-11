@@ -1,5 +1,5 @@
-import React, { useContext } from "react";
-import { ProjectContext } from "../../../shared/context/project-context";
+import { useContext } from "react";
+import { ProjectContext } from "../../../shared/context/ProjectContext";
 import {
   Box,
   Divider,
@@ -10,10 +10,11 @@ import {
   Typography,
   alpha,
 } from "@mui/material";
-import axiosInstance from "../../../shared/api/axiosInstance";
+import useAnnotationActions from "../../../shared/hooks/api/annotation";
 
 const EntitySelector = () => {
-  const [state, dispatch] = useContext(ProjectContext);
+  const [state] = useContext(ProjectContext);
+  const { applyLabelAction } = useAnnotationActions();
 
   const disabled = !state.selectedToken || !state.selectedToken.value;
 
@@ -23,35 +24,8 @@ const EntitySelector = () => {
         .map(([key, _]) => key)
     : [];
 
-  console.log(state);
-
   const handleApply = async ({ tokenId, entityLabelId }) => {
-    /**
-     * Each token has a `tags` field which contains details of applied token-level entity labels (tags).
-     */
-
-    console.log("tokenId", tokenId);
-    console.log("entityLabel", entityLabelId);
-
-    try {
-      const response = await axiosInstance.patch("/api/token/meta/add/single", {
-        tokenId,
-        entityLabelId,
-      });
-
-      if (response.status === 200) {
-        console.log("response.data: ", response.data);
-        dispatch({
-          type: "APPLY_TAG",
-          payload: {
-            applyAll: false,
-            tokenId,
-            tags: response.data,
-            textId: state.selectedTextId,
-          },
-        });
-      }
-    } catch (error) {}
+    await applyLabelAction({ tokenId, entityLabelId });
   };
 
   return (
