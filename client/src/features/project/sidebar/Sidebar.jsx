@@ -14,22 +14,20 @@ import {
 import MuiDrawer from "@mui/material/Drawer";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import { Link, useParams } from "react-router-dom";
-import { blue } from "@mui/material/colors";
 import SaveIcon from "@mui/icons-material/Save";
-import axios from "axios";
 import ShortcutIcon from "@mui/icons-material/Shortcut";
 import HomeIcon from "@mui/icons-material/Home";
-import { ProjectContext } from "../../../shared/context/project-context";
+import { ProjectContext } from "../../../shared/context/ProjectContext";
 import EntitySelector from "./EntitySelector";
 import ToggleOnIcon from "@mui/icons-material/ToggleOn";
 import ToggleOffIcon from "@mui/icons-material/ToggleOff";
 import { styled } from "@mui/material/styles";
-
 import UserDetail from "../../../shared/components/Layout/UserDetail";
 import BrandToolbar from "../../../shared/components/Layout/BrandToolbar";
 import Contextualiser from "./Contextualiser";
 import LogoutButton from "../../../shared/components/Layout/LogoutButton";
 import { ANNOTATION_SIDEBAR_WIDTH } from "../../../shared/constants/layout";
+import useProjectActions from "../../../shared/hooks/api/project";
 
 const Drawer = styled(MuiDrawer, {
   shouldForwardProp: (prop) => prop !== "open",
@@ -60,46 +58,22 @@ const Drawer = styled(MuiDrawer, {
 const Sidebar = () => {
   const { projectId } = useParams();
   const [state, dispatch] = useContext(ProjectContext);
+  const { saveTexts } = useProjectActions();
 
-  const unsavedItemsCount =
-    state.texts &&
-    Object.values(state.texts).length -
-      Object.values(state.texts).filter((text) => text.saved).length;
+  const unsavedItemsCount = state.texts
+    ? Object.values(state.texts).length -
+      Object.values(state.texts).filter((text) => text.saved).length
+    : 0;
 
   const savePending = unsavedItemsCount !== 0;
 
   const handlePageSave = async () => {
-    axios
-      .patch("/api/text/save", {
-        textIds: Object.keys(state.texts),
-        saved: true,
-      })
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({
-            type: "SAVE_TEXTS",
-            payload: { textIds: Object.keys(state.texts), saveState: true },
-          });
-        }
-      })
-      .catch((error) => console.log(`Error: ${error}`));
-
-    axios
-      .get(`/api/project/progress/${projectId}`)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({ type: "SET_VALUE", payload: response.data });
-        }
-      })
-      .catch((error) => console.log(`Error: ${error}`));
+    await saveTexts({
+      projectId,
+      textIds: Object.keys(state.texts),
+      isSaved: true,
+    });
   };
-
-  const username = "test"; //user ? user["https://example.com/username"] : "";
-  const email = "test@email.com"; //user ? user["name"] : "";
-  const color = blue[500];
-  // user
-  //   ? user["https://example.com/color"]
-  //   : theme.palette.primary.main;
 
   return (
     <Drawer
