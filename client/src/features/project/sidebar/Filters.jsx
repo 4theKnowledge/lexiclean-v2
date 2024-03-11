@@ -12,7 +12,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 
-import { ProjectContext } from "../../../shared/context/project-context";
+import { ProjectContext } from "../../../shared/context/ProjectContext";
 
 const Filters = () => {
   const [state, dispatch] = useContext(ProjectContext);
@@ -50,7 +50,9 @@ const Filters = () => {
     rank: (
       <SelectFilter
         name={"rank"}
-        title={"Sort order of documents based on rank (1 high-low, -1 low-high)"}
+        title={
+          "Sort order of documents based on rank (1 high-low, -1 low-high)"
+        }
         defaultValue={state.filters.ranked}
         options={[-1, 1]}
         handleFilterUpdate={handleFilterUpdate}
