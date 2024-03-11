@@ -14,6 +14,7 @@ import {
   Chip,
   IconButton,
   Checkbox,
+  AlertTitle,
 } from "@mui/material";
 import ArticleIcon from "@mui/icons-material/Article";
 import FilePresentIcon from "@mui/icons-material/FilePresent";
@@ -30,7 +31,7 @@ const style = {
   width: 600,
   height: 600,
   overflowY: "auto",
-  bgcolor: "background.paper",
+  bgcolor: "background.light",
   border: "2px solid #000",
   boxShadow: 24,
   p: 4,
@@ -147,11 +148,15 @@ const Upload = (props) => {
 
   return (
     <Grid item xs={12} container spacing={2}>
-      {showAlert && (
-        <Grid item xs={12}>
-          <Alert severity="error">{alertMessage}</Alert>
-        </Grid>
-      )}
+      <Grid item xs={12}>
+        <Alert severity="info">
+          <AlertTitle>Tip!</AlertTitle>
+          Upload your text dataset (corpus) here to normalize and, optionally,
+          tag entities. For details on supported corpus formats, click the help
+          icon. Note: The editor becomes read-only after you upload a file.
+        </Alert>
+        {showAlert && <Alert severity="error">{alertMessage}</Alert>}
+      </Grid>
       <Grid
         item
         xs={12}
@@ -202,6 +207,7 @@ const Upload = (props) => {
               variant="outlined"
               startIcon={<UploadIcon />}
               size="small"
+              disabled
             >
               Upload with identifiers
               <input
@@ -219,6 +225,7 @@ const Upload = (props) => {
               variant="outlined"
               startIcon={<UploadIcon />}
               size="small"
+              disabled
             >
               Upload parallel corpus
               <input
