@@ -1,205 +1,62 @@
 import { useState, useContext, useEffect } from "react";
 import axios from "axios";
-// import { useAuth0 } from "@auth0/auth0-react";
-import {
-  Grid,
-  Stack,
-  Box,
-  Typography,
-  IconButton,
-  Tooltip,
-  Menu,
-  MenuItem,
-  Button,
-} from "@mui/material";
+import { Grid, Stack, Box, Typography, Button, Paper } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { grey, green, orange, teal, yellow } from "@mui/material/colors";
-import SaveIcon from "@mui/icons-material/Save";
-import FlagIcon from "@mui/icons-material/Flag";
-import TextSnippetIcon from "@mui/icons-material/TextSnippet";
-import JoinFullIcon from "@mui/icons-material/JoinFull";
+import { grey, green, yellow } from "@mui/material/colors";
 import { Text } from "./Text";
 import { ProjectContext } from "../../shared/context/project-context";
 import { getTokenWidth } from "../../shared/utils/token";
+import ActionTray from "./ActionTray";
 
 export const TextContainer = (props) => {
   const { text, textId, textIndex } = props;
-
   const [state, dispatch] = useContext(ProjectContext);
-
-  const handleSave = async (textId, saveState) => {
-    axios
-      .patch("/api/text/save", {
-        textIds: [textId],
-        saved: saveState,
-      })
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({
-            type: "SAVE_TEXTS",
-            payload: { textIds: [textId], saveState: saveState },
-          });
-        }
-      });
-
-    axios
-      .get(`/api/project/progress/${state.projectId}`)
-      .then((response) => {
-        if (response.status === 200) {
-          dispatch({ type: "SET_VALUE", payload: response.data });
-        }
-      })
-      .catch((error) => console.log(`Error: ${error}`));
-  };
-
-  const handleTokenizeText = () => {
-    dispatch({
-      type: "SET_VALUE",
-      payload: {
-        tokenizeTextId: state.tokenizeTextId == textId ? null : textId,
-      },
-    });
-  };
 
   return (
     <Grid
-      item
       container
-      justifyContent="space-between"
+      item
+      as={Paper}
+      variant="outlined"
+      m="1rem 0rem"
+      xs={12}
       id={`text-container-${textIndex}`}
-      p={4}
+      sx={{
+        display: "flex",
+        flexDirection: "row",
+        userSelect: "none",
+        minHeight: 140,
+        backgroundColor: "background.light",
+      }}
     >
-      {/* Document index */}
-      <Grid
-        item
-        xs={1}
-        container
-        justifyContent="top"
-        direction="column"
-        alignItems="center"
-      >
+      <Grid item xs={12} p={2}>
+        <ActionTray textId={textId} textIndex={textIndex} />
+      </Grid>
+      <Grid item xs={12} p={2}>
         <Box
+          component="div"
+          key={textIndex}
           sx={{
-            borderRight: "1px solid",
-            borderColor: grey[300],
-            cursor: "help",
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
           }}
-          p={1}
         >
-          <Tooltip
-            title={`${
-              text.identifiers === undefined
-                ? "No external id"
-                : text.identifiers.join(", ")
-            }`}
-            placement="left-start"
-          >
-            <Typography variant="button">
-              {textIndex + 1 + (state.pageNumber - 1) * state.pageLimit}
-            </Typography>
-          </Tooltip>
+          <Box display="flex" flexDirection="column">
+            {state.showReferences && (
+              <Typography variant="caption" sx={{ color: grey[500] }} pb={1}>
+                {text.reference}
+              </Typography>
+            )}
+            {state.tokenizeTextId == textId ? (
+              <TokenizedText textId={textId} tokens={text.tokens} />
+            ) : (
+              <Text text={text} textId={textId} />
+            )}
+          </Box>
         </Box>
       </Grid>
-      {/* Document rendered as tokens*/}
-      <Grid item xs={10}>
-        {state.showReferences && (
-          <Typography variant="caption" sx={{ color: grey[400] }} p={0.5}>
-            {text.reference}
-          </Typography>
-        )}
-        {state.tokenizeTextId == textId ? (
-          <TokenizedText textId={textId} tokens={text.tokens} />
-        ) : (
-          <Text text={text} textId={textId} />
-        )}
-      </Grid>
-      {/* Interactive Tray (save, relation indicator, etc.s) */}
-      <Grid
-        item
-        xs={1}
-        container
-        justifyContent="top"
-        alignItems="center"
-        direction="column"
-      >
-        <Stack
-          direction="column"
-          spacing={1}
-          m={0}
-          p={1}
-          sx={{ borderLeft: "1px solid", borderColor: grey[300] }}
-        >
-          <Stack direction="row">
-            <IconButton
-              size="small"
-              title="Click to tokenize"
-              onClick={handleTokenizeText}
-            >
-              <JoinFullIcon
-                fontSize="inherit"
-                sx={{
-                  color:
-                    state.tokenizeTextId != null &&
-                    state.tokenizeTextId !== textId &&
-                    grey[300],
-                }}
-              />
-            </IconButton>
-            <IconButton
-              size="small"
-              title={text.saved ? "Click to unsave" : "Click to save"}
-              onClick={() => handleSave(textId, !text.saved)}
-            >
-              <SaveIcon
-                fontSize="inherit"
-                sx={{ color: text.saved ? teal[300] : orange[300] }}
-              />
-            </IconButton>
-            {/* <FlagComponent /> */}
-            <IconButton
-              size="small"
-              title={`Original document: ${text.original}`}
-            >
-              <TextSnippetIcon fontSize="inherit" />
-            </IconButton>
-          </Stack>
-        </Stack>
-      </Grid>
     </Grid>
-  );
-};
-
-const FlagComponent = () => {
-  const [anchorEl, setAnchorEl] = useState(null);
-  const open = Boolean(anchorEl);
-  const handleClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleClose = () => {
-    setAnchorEl(null);
-  };
-
-  return (
-    <>
-      <IconButton
-        size="small"
-        title="Click to flag this document"
-        onClick={handleClick}
-      >
-        <FlagIcon fontSize="inherit" sx={{ color: grey[400] }} />
-      </IconButton>
-      <Menu
-        id="flag-menu"
-        anchorEl={anchorEl}
-        open={open}
-        onClose={handleClose}
-        transformOrigin={{ horizontal: "right", vertical: "top" }}
-        anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-      >
-        <MenuItem onClick={handleClose}>TBC</MenuItem>
-      </Menu>
-    </>
   );
 };
 
@@ -263,7 +120,7 @@ const TokenizedText = ({ textId, tokens }) => {
   };
 
   return (
-    <div>
+    <Box display="flex" flexDirection="column" alignItems="left">
       <Box
         key={`tokenize-text-${textId}`}
         sx={{ display: "flex", flexDirection: "row", flexWrap: "wrap" }}
@@ -290,11 +147,12 @@ const TokenizedText = ({ textId, tokens }) => {
             );
           })}
       </Box>
-      <Stack direction="row">
+      <Stack direction="row" mt={2} spacing={2}>
         <Button
           size="small"
           disabled={tokenIndexes.size <= 1 || !valid}
           onClick={handleTokenize}
+          variant="outlined"
         >
           Apply
         </Button>
@@ -302,10 +160,11 @@ const TokenizedText = ({ textId, tokens }) => {
           size="small"
           disabled={tokenIndexes.size === 0}
           onClick={handleReset}
+          variant="outlined"
         >
           Clear
         </Button>
       </Stack>
-    </div>
+    </Box>
   );
 };
