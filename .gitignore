@@ -26,7 +26,6 @@ yarn-error.log*
 
 .vscode
 .env
-backend/src/logger/logs.json
 
 /dev
 /test
@@ -35,3 +34,5 @@ backend/src/logger/logs.json
 */venv
 .babelrc
 */__pycache__/*
+backend/logger/logs.json
+backend/src/logger/logs.json
