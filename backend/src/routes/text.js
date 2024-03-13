@@ -1,117 +1,39 @@
-const express = require("express");
-const router = express.Router();
-const logger = require("../logger");
-const Text = require("../models/Text");
-const Token = require("../models/Token");
-const Resource = require("../models/Resource");
-const { formatTextOutput } = require("../utils/text");
+import express from "express";
+import logger from "../logger/index.js";
+import Text from "../models/Text.js";
+import Token from "../models/Token.js";
+import Project from "../models/Project.js";
+import Resource from "../models/Resource.js";
+import Annotations from "../models/Annotations.js";
+import {
+  formatTextOutput,
+  filterTextsBySearchTerm,
+  processAnnotations,
+} from "../utils/text.js";
+import mongoose from "mongoose";
 
+const router = express.Router();
+
+/**
+ * Filters project texts for client pagination.
+ * TODO: limit the texts based on the user being the `user` on the project or in the projects `annotators` array.
+ */
 router.post("/filter", async (req, res) => {
-  //
-  console.log("text filter body", req.body);
+  logger.info("Paginating texts.", {
+    route: `/api/text/filter`,
+    body: req.body,
+  });
 
   try {
-    // if (req.body.get_pages) {
-    // Returns total pages instead of page of results
-    // try {
-    //     logger.info("Getting number of pages for paginator (search filtered)", {
-    //       route: "/api/text/filter",
-    //     });
-
-    //     const filter = req.body.filter;
-
-    //     let textsCount;
-    //     if (filter.searchTerm !== "" || filter.saved !== "all") {
-    //       // Search is case-insensitive, non-exact matching
-    //       const tokenResponse = await Token.find({
-    //         projectId: req.body.projectId,
-    // $or: [
-    //   { value: { $regex: filter.searchTerm, $options: "i" } },
-    //   { replacement: { $regex: filter.searchTerm, $options: "i" } },
-    // ],
-    //       }).lean();
-
-    //       const tokenIds = new Set(tokenResponse.map((token) => token._id));
-
-    //       const textResponse = await Text.find({
-    //         projectId: req.body.projectId,
-    //         "tokens.token": { $in: Array.from(tokenIds) },
-    //       }).lean();
-
-    //       const textIds = new Set(textResponse.map((text) => text._id));
-
-    //       textsCount = await Text.find({
-    //         projectId: req.body.projectId,
-    //         _id: { $in: Array.from(textIds) },
-    //         saved:
-    //           filter.saved === "saved"
-    //             ? true
-    //             : filter.saved === "unsaved"
-    //             ? false
-    //             : { $in: [true, false] },
-    //       }).count();
-    //     } else {
-    //       textsCount = await Text.find({
-    //         projectId: req.body.projectId,
-    //       }).count();
-    //     }
-
-    //     const pages = Math.ceil(textsCount / req.query.limit);
-
-    //     res.json({ totalPages: pages });
-    //   } catch (err) {
-    //     res.json({ message: err });
-    //     logger.error("Failed to get number of pages for paginator", {
-    //       route: `/api/text/filter/pages/${req.params.projectId}`,
-    //     });
-    //   }
-    // } else {
-    //   logger.info("Fetching results from paginator", {
-    //     route: "/api/text/filter",
-    //   });
-
-    //   const skip = parseInt((req.query.page - 1) * req.query.limit); // equiv to page
-    //   const limit = parseInt(req.query.limit); // same as limit
-    //   const filter = req.body.filter;
-
-    //   let textIds;
-    //   if (filter.searchTerm !== "" || filter.candidates !== "all") {
-    //     // Case insensitive filter; filters for all tokens if no term specified
-    //     const tokenResponse = await Token.find({
-    //       projectId: req.body.projectId,
-    //       $or: [
-    //         { value: { $regex: filter.searchTerm, $options: "i" } },
-    //         { replacement: { $regex: filter.searchTerm, $options: "i" } },
-    //       ],
-    //     }).lean();
-
-    //     // OOV Candidate search
-    //     // These are tokens that are non-English, do not have a replacement or meta-tag
-    //     const candidateTokens = tokenResponse
-    //       .filter(
-    //         (token) =>
-    //           !token.tags["en"] &&
-    //           Object.keys(token.tags).length <= 1 &&
-    //           !token.replacement
-    //       )
-    //       .map((token) => token._id);
-    //     console.log("token candidates", candidateTokens);
-
-    //     const tokenIds = new Set(tokenResponse.map((token) => token._id));
-    //     const textResponse = await Text.find({
-    //       projectId: req.body.projectId,
-    //       "tokens.token": { $in: Array.from(tokenIds) },
-    //     }).lean();
-
-    //     textIds = new Set(textResponse.map((text) => text._id));
-    //   }
+    const userId = req.userId;
 
     const skip = parseInt((req.query.page - 1) * req.query.limit);
     const limit = parseInt(req.query.limit);
+    const rank = req.body.filters.rank;
 
-    const saveState = req.body.filters.saved;
-    const searchTerm = req.body.filters.searchTerm;
-    const referenceSearchTerm = req.body.filters.referenceSearchTerm;
+    const saveState = req.body.filters.saved || "all";
+    const searchTerm = req.body.filters.searchTerm || "";
+    const referenceSearchTerm = req.body.filters.referenceSearchTerm || "";
     const hasReferenceSearchTerm = referenceSearchTerm !== "";
 
     // Find textIds from reference search term matches
@@ -135,83 +57,107 @@ router.post("/filter", async (req, res) => {
       console.log("referenceTextIds", referenceTextIds);
     }
 
-    // NOTE: $regex replace is used to escape special characters
-    let matchedTokens = await Token.find(
-      {
-        projectId: req.body.projectId,
-        textId: hasReferenceSearchTerm
-          ? { $in: referenceTextIds }
-          : { $exists: true },
-        $or: [
-          {
-            value: {
-              $regex: searchTerm.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"),
-              $options: "i",
-            },
-          },
-          {
-            replacement: {
-              $regex: searchTerm.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"),
-              $options: "i",
-            },
-          },
-        ],
-      },
-      { textId: 1 }
+    // Get textIds associated with project
+    const project = await Project.findOne(
+      { _id: req.body.projectId },
+      { texts: 1 }
     ).lean();
-    textIdsFromTokens = matchedTokens.map((t) => t.textId);
 
-    // textIdsFromTokens.push(...referenceTextIds.map((t) => t._id));
+    const textIds = project.texts;
 
-    const matchedTexts = await Text.find({
-      _id: { $in: textIdsFromTokens },
-      saved:
-        saveState === "all"
-          ? { $in: [true, false] }
-          : saveState === "yes"
-          ? true
-          : false,
-    })
-      .sort({ rank: req.body.filters.rank })
-      .skip(skip)
-      .limit(limit)
-      .populate("tokens.token");
-
-    const totalTexts = await Text.count({
-      _id: { $in: textIdsFromTokens },
-      saved:
-        saveState === "all"
-          ? { $in: [true, false] }
-          : saveState === "yes"
-          ? true
-          : false,
+    const textsMatchingSearchTerm = await filterTextsBySearchTerm({
+      projectId: req.body.projectId,
+      userId,
+      textIds,
+      searchTerm: searchTerm,
     });
 
-    // Turn texts and tokens into hashmaps (text uses _id, tokens use tokens index)
+    console.log("textsMatchingSearchTerm: ", textsMatchingSearchTerm);
+
+    // Find texts by _id and populate with Annotations etc.
+    // TODO: Handle save state... These should be found by themselves and used to filter out (or not) textId results.
+
+    const textSaveAnnotations = await Annotations.find({
+      userId,
+      textId: { $in: project.texts },
+      type: "save",
+    }).lean();
+    console.log("textSaveAnnotations: ", textSaveAnnotations);
+
+    let savedTextIds = textSaveAnnotations.map((a) => a.textId);
+    console.log("savedTextIds: ", savedTextIds);
+
+    let matchedTexts;
+    try {
+      matchedTexts = await Text.aggregate([
+        {
+          $match: {
+            _id: { $in: textsMatchingSearchTerm },
+          },
+        },
+        {
+          $lookup: {
+            from: "annotations",
+            let: { textId: "$_id" }, // Define the local variable textId to use in the pipeline
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      { $eq: ["$textId", "$$textId"] }, // Ensure the document's textId matches the text's _id
+                      { $eq: ["$userId", mongoose.Types.ObjectId(userId)] }, // Filter by userId
+                    ],
+                  },
+                },
+              },
+            ],
+            as: "annotations",
+          },
+        },
+        { $sort: { rank } },
+        { $skip: skip },
+        { $limit: limit },
+      ]);
+    } catch (error) {
+      console.log(error);
+      matchedTexts = [];
+    }
+    console.log(matchedTexts);
+
+    // Process annotations
+    const processedTexts = processAnnotations(matchedTexts);
+
+    console.log("processedTexts: ", processedTexts);
+
+    // Total Texts are the ENTIRE set of matches, not just the set returned.
+    let totalTexts;
+    try {
+      totalTexts = await Text.count({
+        _id: { $in: textsMatchingSearchTerm },
+        // saved:
+        //   saveState === "all"
+        //     ? { $in: [true, false] }
+        //     : saveState === "yes"
+        //     ? true
+        //     : false,
+      });
+    } catch (error) {
+      console.log(error);
+    }
+
+    savedTextIds = savedTextIds.map((tId) => tId.toString());
+
     const payload = Object.assign(
       {},
-      ...matchedTexts.map((text) => ({
+      ...processedTexts.map((text) => ({
         [text._id]: {
-          weight: text.weight,
-          rank: text.rank,
-          saved: text.saved,
-          identifiers: text.identifiers,
-          original: text.original,
-          reference: text.reference,
+          ...text,
+          saved: savedTextIds.includes(text._id.toString()),
           tokens: Object.assign(
             {},
-            ...text.tokens.map((token) => ({
+            ...Object.values(text.tokens).map((token) => ({
               [token.index]: {
-                _id: token.token._id,
-                value: token.token.value,
-                currentValue: token.token.replacement // Adds current value of token based on state of token. This can be updated in reducers at scale/
-                  ? token.token.replacement
-                  : token.token.suggestion
-                  ? token.token.suggestion
-                  : token.token.value,
-                tags: token.token.tags,
-                replacement: token.token.replacement,
-                suggestion: token.token.suggestion,
+                ...token,
               },
             }))
           ),
@@ -219,7 +165,7 @@ router.post("/filter", async (req, res) => {
       }))
     );
 
-    res.status(200).send({ texts: payload, totalTexts: totalTexts });
+    res.json({ texts: payload, totalTexts });
   } catch (error) {
     logger.error("Failed to get text pagination results", {
       route: `/api/text/filter/${req.body.projectId}`,
@@ -228,19 +174,40 @@ router.post("/filter", async (req, res) => {
   }
 });
 
+/**
+ * Updates the saved state of a single, or set of, textId(s)
+ */
 router.patch("/save", async (req, res) => {
-  // Updates the saved state of a single, or set of, textId(s)
+  logger.info("Saving text(s)", {
+    route: `/api/text/save`,
+    body: req.body,
+  });
   try {
-    logger.info("Saving text(s)", {
-      route: `/api/text/save`,
-    });
+    const userId = req.userId;
 
-    await Text.updateMany(
-      {
-        _id: { $in: req.body.textIds },
-      },
-      { saved: req.body.saved }
-    );
+    let { textIds, saved } = req.body;
+
+    textIds = textIds.map((tId) => mongoose.Types.ObjectId(tId));
+
+    if (saved) {
+      // User is trying to add save state
+      const bulkOps = textIds.map((id) => ({
+        updateOne: {
+          filter: { userId, textId: id, type: "save" },
+          update: { $setOnInsert: { type: "save", value: true } },
+          upsert: true, // Insert document if not exists, but don't update if it does
+        },
+      }));
+
+      await Annotations.bulkWrite(bulkOps);
+    } else {
+      // User is trying to remove save state
+      await Annotations.deleteMany({
+        userId,
+        textId: { $in: textIds },
+        type: "save",
+      });
+    }
 
     res.status(200).send({ updated: true });
   } catch (error) {
@@ -249,11 +216,62 @@ router.patch("/save", async (req, res) => {
   }
 });
 
+/**
+ * Add/remove flag annotation associated with text
+ */
+router.patch("/flag", async (req, res) => {
+  logger.info("Paginating texts.", {
+    route: `/api/text/filter`,
+    body: req.body,
+  });
+
+  try {
+    const userId = req.userId;
+    let { textId, flagId } = req.body;
+
+    textId = mongoose.Types.ObjectId(textId);
+    flagId = mongoose.Types.ObjectId(flagId);
+
+    const annotation = await Annotations.findOne({
+      userId,
+      textId,
+      type: "flag",
+      value: flagId,
+    });
+    console.log("annotation: ", annotation);
+
+    if (annotation) {
+      // Remove from text
+      console.log("removing flag from text");
+      await Annotations.deleteOne({
+        userId,
+        textId,
+        type: "flag",
+        value: flagId,
+      });
+      res.status(200).send({ message: "Successly deleted flag" });
+    } else {
+      // Add to text
+      console.log("adding flag to text");
+      await Annotations.create({
+        userId,
+        textId,
+        type: "flag",
+        value: flagId,
+      });
+      res.status(200).send({ message: "Successly added flag" });
+    }
+  } catch (error) {
+    console.log(error);
+  }
+});
+
+/**
+ * Joins continguous groups of n-grams on a givent ext.
+ * Note: `TK` refers to 'To Keep`
+ * TODO: Review how this integrates with new `Annotation` collection
+ */
 router.patch("/tokenize", async (req, res) => {
-  /**
-   * Joins continguous groups of n-grams on a givent ext.
-   * Note: `TK` refers to 'To Keep`
-   */
   try {
     logger.info("Tokenizing single text", {
       route: `/api/text/tokenize`,
@@ -405,64 +423,6 @@ router.patch("/tokenize", async (req, res) => {
   }
 });
 
-// [REVIEW] Undo text tokenization - single text
-// WIP - requires using the tokenization history to walk back...
-// currently legacy code.
-// router.patch("/tokenize/undo", async (req, res) => {
-//   try {
-//     const textId = await Text.findById({ _id: req.body.textId }).lean();
-
-//     // Remove old tokens
-//     const oldTokenIds = textId.tokens.map((token) => token._id);
-//     await Token.deleteMany({ _id: { $in: oldTokenIds } });
-
-//     // Create new tokens
-//     const enMap = await Resource.findOne({ type: "en" }).lean();
-//     const enMapSet = new Set(enMap.tokens);
-
-//     // Here all historical info will be stripped from new tokens regardless of whether new combinations are in IV form
-//     const newTokenList = textId.original.split(" ").map((token) => {
-//       return {
-//         value: token,
-//         tags: { en: enMapSet.has(token) },
-//         replacement: null,
-//         suggestion: null,
-//         projectId: textId.projectId,
-//       };
-//     });
-
-//     // Insert tokens into Token collection
-//     const tokenListRes = await Token.insertMany(newTokenList);
-
-//     const tokensPayload = {
-//       tokens: tokenListRes.map((token, index) => ({
-//         index: index,
-//         token: token._id,
-//       })),
-//     };
-
-//     const updatedTextRes = await Text.findByIdAndUpdate(
-//       { _id: req.body.textId },
-//       tokensPayload,
-//       { new: true }
-//     )
-//       .populate("tokens.token")
-//       .lean();
-
-//     // convert text into same format as the paginator (this is expected by front-end components)
-//     const outputTokens = updatedTextRes.tokens.map((token) => ({
-//       ...token.token,
-//       index: token.index,
-//       token: token.token._id,
-//     }));
-//     const outputText = { ...updatedTextRes, tokens: outputTokens };
-
-//     res.json(outputText);
-//   } catch (err) {
-//     res.json({ message: err });
-//   }
-// });
-
 // router.patch("/tokenize/all", async (req, res) => {
 //   // For trivial cases like ['hell', 'o', 'world'] this is easy.
 //   // However, for hard cases like ['hell', 'o', 'w', 'o', 'rld'] this becomes hard
@@ -474,4 +434,4 @@ router.patch("/tokenize", async (req, res) => {
 //   }
 // });
 
-module.exports = router;
+export default router;
