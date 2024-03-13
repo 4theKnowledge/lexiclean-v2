@@ -1,556 +1,819 @@
-const express = require("express");
+import express from "express";
+import logger from "../logger/index.js";
+import Text from "../models/Text.js";
+import { formatTextOutput } from "../utils/text.js";
+import Annotations from "../models/Annotations.js";
+import mongoose from "mongoose";
+import {
+  textTokenSearchPipeline,
+  singleTokenFromTextPipeline,
+} from "../aggregations/token.js";
+
 const router = express.Router();
-const logger = require("../logger");
-const Token = require("../models/Token");
-const Text = require("../models/Text");
-const Resource = require("../models/Resource");
-const { formatTextOutput } = require("../utils/text");
 
+/**
+ * Route for adding token-level replacmement, e.g. "hllo" -> "hello".
+ * Optionality for cascading change across the corpora for matching tokens.
+ * TODO: Ensure that when `applyAll` is used, saved texts are not impacted. Filter these out.
+ */
 router.patch("/add", async (req, res) => {
-  try {
-    let response;
-    if (req.body.applyAll) {
-      // Applies replacement to token and suggestions to all other
-      // tokens that match
-      logger.info("Applying replacement to all token matches", {
-        route: "/api/token/add",
-        body: req.body,
-      });
+  logger.info("Applying token replacement(s).", {
+    route: `/api/token/add`,
+    body: req.body,
+  });
 
-      const focusToken = await Token.findById({
-        _id: req.body.tokenId,
+  try {
+    const userId = req.userId;
+
+    let { textId, tokenId, projectId, applyAll, originalValue, replacement } =
+      req.body;
+
+    let annotations = [];
+    let textTokenIds = {};
+    let updatedFocusToken = false;
+
+    textId = mongoose.Types.ObjectId(req.body.textId);
+    tokenId = mongoose.Types.ObjectId(req.body.tokenId);
+    projectId = mongoose.Types.ObjectId(req.body.projectId);
+
+    if (applyAll) {
+      // Add annotation on "focus token" (token event is triggered from.)
+      // TODO: If focus token already has suggested replacement, make it become accepted (isSuggestion=False).
+
+      const focusAnnotation = await Annotations.findOne({
+        textId,
+        tokenId,
+        userId,
+        type: "replacement",
       }).lean();
 
-      await Token.findByIdAndUpdate(
-        { _id: req.body.tokenId },
-        { replacement: req.body.replacement }
-      );
-
-      // Filter for only unsaved texts to ensure that saved documents are not modified
-      let unsavedTextIds = await Text.find(
-        { projectId: focusToken.projectId, saved: false },
-        { _id: 1 }
-      ).lean();
-      unsavedTextIds = unsavedTextIds.map((t) => t._id.toString());
-
-      const tokenMatches = await Token.find({
-        projectId: focusToken.projectId,
-        value: focusToken.value,
-        replacement: { $eq: null },
-        _id: { $ne: req.body.tokenId },
-        textId: { $in: unsavedTextIds },
-      }).lean();
-
-      console.log("Number of matches", tokenMatches.length);
-
-      const updatedTokens = tokenMatches.map((token) => ({
-        updateOne: {
-          filter: { _id: token._id },
-          update: {
-            suggestion: req.body.replacement,
-          },
-          upsert: true,
-        },
-      }));
-      await Token.bulkWrite(updatedTokens);
-
-      // Filtered tokens for UI rendering
-      const filteredTokens = tokenMatches.filter((t) =>
-        req.body.textIds.includes(t.textId.toString())
-      );
-
-      const textTokenIds = filteredTokens.reduce((value, object) => {
-        if (value[object.textId]) {
-          value[object.textId].push(object._id);
-        } else {
-          value[object.textId] = [object._id];
+      if (focusAnnotation) {
+        if (focusAnnotation.isSuggestion) {
+          // Convert replacement suggestion to replacement
+          await Annotations.updateOne(
+            {
+              _id: focusAnnotation._id,
+            },
+            { $set: { isSuggestion: false } }
+          );
+          // updatedFocusToken = true;
         }
-        return value;
-      }, {});
-
-      res.json({
-        matches: tokenMatches.length,
-        textTokenIds: textTokenIds,
-      });
-    } else {
-      logger.info("Adding replacement to a single token", {
-        route: "/api/token/add",
-        body: req.body,
-      });
-
-      response = await Token.updateOne(
-        { _id: req.body.tokenId },
-        {
-          replacement: req.body.replacement,
-        },
-        { upsert: true }
-      );
-      res.json({
-        matches: 1,
-        textTokenIds: { [req.body.textId]: [req.body.tokenId] },
-      });
-    }
-  } catch (error) {
-    res.json({ details: error });
-  }
-});
-
-router.patch("/delete", async (req, res) => {
-  try {
-    logger.info("Deleting detail on single", {
-      route: `/api/token/delete`,
-    });
-
-    let response;
-
-    // Remove replacements on all tokens with same replacement and original value
-    // this also includes removing tokens with suggestion too
-    if (req.body.applyAll) {
-      const focusToken = await Token.findById({ _id: req.body.tokenId }).lean();
-
-      console.log("focusToken", focusToken);
-
-      const focusTokenHasReplacement = focusToken.replacement;
-
-      const matchOp = focusTokenHasReplacement
-        ? {
-            $or: [
-              {
-                replacement: focusToken.replacement,
-              },
-              {
-                suggestion: focusToken.replacement,
-              },
-            ],
-          }
-        : { suggestion: focusToken.suggestion };
-
-      const tokenMatches = await Token.find({
-        $and: [
-          { projectId: focusToken.projectId },
-          { value: focusToken.value },
-          matchOp,
-        ],
-      });
-
-      console.log("number of tokenMatches", tokenMatches.length);
-
-      const updateOp = focusTokenHasReplacement
-        ? { replacement: null, suggestion: null }
-        : { suggestion: null };
-
-      const tokenIds = tokenMatches.map((t) => t._id);
-
-      // Filtered tokens for UI rendering
-      const filteredTokens = tokenMatches.filter((t) =>
-        req.body.textIds.includes(t.textId.toString())
-      );
-
-      const textTokenIds = filteredTokens.reduce((value, object) => {
-        if (value[object.textId]) {
-          value[object.textId].push(object._id);
-        } else {
-          value[object.textId] = [object._id];
-        }
-        return value;
-      }, {});
-
-      await Token.updateMany({ _id: { $in: tokenIds } }, updateOp, {
-        upsert: true,
-      });
-
-      res.json({ matches: tokenMatches.length, textTokenIds: textTokenIds });
-    } else {
-      response = await Token.updateOne(
-        {
-          _id: req.body.tokenId,
-        },
-        {
-          replacement: null,
-          suggestion: null,
-        }
-      );
-      res.json({
-        matches: 1,
-        textTokenIds: { [req.body.textId]: [req.body.tokenId] },
-      });
-    }
-  } catch (err) {
-    res.json({ message: err });
-  }
-});
-
-router.patch("/accept", async (req, res) => {
-  try {
-    if (req.body.applyAll) {
-      // Accept suggested replacements as actual replacements for all suggestion instances
-      logger.info("Accepting all suggestions", {
-        route: `/api/token/accept`,
-      });
-
-      const focusToken = await Token.findById({ _id: req.body.tokenId }).lean();
-
-      const tokenMatches = await Token.find({
-        projectId: focusToken.projectId,
-        value: focusToken.value,
-        suggestion: focusToken.suggestion,
-      }).lean();
-
-      console.log("token matches", tokenMatches.length);
-
-      const tokenIds = tokenMatches.map((t) => t._id);
-
-      // Filtered tokens for UI rendering
-      const filteredTokens = tokenMatches.filter((t) =>
-        req.body.textIds.includes(t.textId.toString())
-      );
-
-      const textTokenIds = filteredTokens.reduce((value, object) => {
-        if (value[object.textId]) {
-          value[object.textId].push(object._id);
-        } else {
-          value[object.textId] = [object._id];
-        }
-        return value;
-      }, {});
-
-      await Token.updateMany(
-        { _id: { $in: tokenIds } },
-        { replacement: focusToken.suggestion, suggestion: null },
-        {
-          upsert: true,
-        }
-      );
-
-      res.json({ matches: tokenMatches.length, textTokenIds: textTokenIds });
-    } else {
-      // Accept single suggestion and convert into replacement
-      let token = await Token.findById({ _id: req.body.tokenId });
-      token.replacement = token.suggestion;
-      token.suggestion = null;
-      token.save();
-
-      res.json({
-        matches: 1,
-        textTokenIds: { [req.body.textId]: [req.body.tokenId] },
-      });
-    }
-  } catch (error) {
-    res.json({ details: error });
-  }
-});
-
-router.patch("/split", async (req, res) => {
-  /**
-   * Splits a given token into `n` new tokens based on introduced whitespace.
-   * TODO: Investigate how to classify tokens as IV/OOV without long load time of English lexicon.
-   */
-  try {
-    console.log(req.body);
-
-    let text = await Text.findById({ _id: req.body.textId });
-
-    const tokenIndex = req.body.tokenIndex;
-
-    // const enMap = await Resource.findOne({ type: "en" }).lean();
-    // const enMapSet = new Set(enMap.tokens);
-
-    // console.log("enMap token size", enMap.tokens.length);
-
-    // Here all historical information will be stripped from new tokens, however they will be
-    // checked for if they are OOV
-    const newTokenList = req.body.currentValue.split(" ").map((token) => ({
-      value: token,
-      active: true,
-      tags: { en: false }, // enMapSet.has(token)
-      replacement: null,
-      suggestion: null,
-      projectId: text.projectId,
-      textId: text._id,
-    }));
-
-    // console.log("new tokens", newTokenList);
-
-    // Save new tokens to db
-    const tokenListRes = await Token.insertMany(newTokenList);
-
-    // Delete old tokens (TODO: investigate whether soft delete is better)
-    await Token.findByIdAndDelete({ _id: req.body.tokenId });
-
-    // Update old and new token indexes
-    const tokensToAdd = tokenListRes.map((token, index) => ({
-      token: token._id,
-      index: tokenIndex + index, // give new tokens index which is offset by the original tokens index
-    }));
-
-    // Insert new tokens - NOTE: this happens in place on the text object.
-    text.tokens.splice(tokenIndex, 1, ...tokensToAdd);
-
-    // Reassign indexes based on current ordering
-    text.tokens = text.tokens.map((token, newIndex) => ({
-      ...token,
-      index: newIndex,
-    }));
-
-    // Update text
-    // text.save();
-
-    await Text.findByIdAndUpdate(
-      { _id: req.body.textId },
-      { tokens: text.tokens },
-      {
-        new: true,
+      } else {
+        // No replacement exists, create one.
+        await Annotations.create({
+          type: "replacement",
+          userId,
+          textId,
+          tokenId,
+          value: replacement,
+          isSuggestion: false,
+        });
+        updatedFocusToken = true;
       }
-    );
 
-    text = await Text.findById({ _id: req.body.textId })
-      .populate("tokens.token")
-      .lean();
+      // Find matching tokens on texts
+      let tokensIdsToUpdate;
+      let tokensToUpdate;
+      try {
+        const matchingTokens = await Text.aggregate(
+          textTokenSearchPipeline({
+            projectId,
+            excludeTokenIds: [tokenId],
+            searchTerm: originalValue,
+          })
+        );
 
-    res.json(formatTextOutput(text));
-  } catch (error) {
-    console.log(`Error occurred when splitting token - ${error}`);
-    res.json({ details: error });
-  }
-});
+        console.log("matchingTokens: ", matchingTokens);
 
-router.patch("/remove", async (req, res) => {
-  /**
-   * Removes a given token from a text
-   * TODO: Handle when only one token on text. Don't let user delete it, replace token content with empty string.
-   */
-  try {
-    if (req.body.applyAll) {
-      const focusToken = await Token.findById({ _id: req.body.tokenId }).lean();
+        const matchingTokenIds = matchingTokens.map((t) =>
+          t.tokenId.toString()
+        );
 
-      const matchedTokens = await Token.find({
-        projectId: focusToken.projectId,
-        value: focusToken.value,
+        // Check that no replacement annotations have already been
+
+        // Filter out any matching tokens that have replacement annotations
+        const tokensToExclude = await Annotations.find({
+          userId,
+          type: "replacement",
+          tokenId: {
+            $in: matchingTokenIds.map((id) => mongoose.Types.ObjectId(id)),
+          }, // Ensure consistent ObjectId comparison
+        }).lean();
+
+        console.log("tokensToExclude: ", tokensToExclude);
+
+        // Convert tokenIdsToExclude to strings for consistent comparison
+        const tokenIdsToExclude = tokensToExclude.map((t) =>
+          t.tokenId.toString()
+        );
+
+        // Now filter using the string representation of token IDs
+        tokensIdsToUpdate = matchingTokenIds.filter(
+          (tId) => !tokenIdsToExclude.includes(tId)
+        );
+
+        console.log("tokensIdsToUpdate: ", tokensIdsToUpdate);
+
+        // Get token objects
+        tokensToUpdate = matchingTokens.filter((t) =>
+          tokensIdsToUpdate.includes(t.tokenId.toString())
+        );
+
+        console.log("tokensToUpdate: ", tokensToUpdate);
+      } catch (error) {
+        console.log(error);
+      }
+
+      // Update matching tokens with replacement and isSuggestion=True
+      try {
+        const annotationUpdateObjs = tokensToUpdate.map((token) => {
+          // Check if the textId key already exists in textTokenIds
+          if (textTokenIds[token.textId]) {
+            // If it exists, push the current tokenId into the array
+            textTokenIds[token.textId].push(token.tokenId);
+          } else {
+            // If it doesn't exist, initialize it with a new array containing the current tokenId
+            textTokenIds[token.textId] = [token.tokenId];
+          }
+
+          return {
+            insertOne: {
+              document: {
+                userId,
+                tokenId: token.tokenId,
+                textId: token.textId,
+                type: "replacement",
+                isSuggestion: true,
+                value: replacement,
+              },
+            },
+          };
+        });
+
+        await Annotations.bulkWrite(annotationUpdateObjs);
+      } catch (error) {
+        console.log(error);
+      }
+
+      annotations = [
+        ...tokensToUpdate,
+        ...(updatedFocusToken ? ["focusToken"] : []),
+      ];
+    } else {
+      const annotation = await Annotations.findOne({
+        tokenId,
+        userId,
+        type: "replacement",
       }).lean();
 
-      console.log("matchedTokens", matchedTokens);
-
-      const matchedTextIds = matchedTokens.map((t) => t.textId);
-
-      let texts = await Text.find({
-        _id: { $in: matchedTextIds },
-        $or: [
-          {
-            saved: false, // Exclude user saved texts
-            _id: focusToken.textId,
-          },
-        ],
-      }).populate("tokens.token");
-
-      let savedTextIds = texts.map((t) => t._id.toString());
-
-      console.log("savedTextIds", savedTextIds);
-
-      texts.forEach((text) => {
-        text.tokens = text.tokens
-          .filter((t) => t.token.value !== focusToken.value)
-          .map((t, index) => ({ index: index, token: t.token }));
-
-        text.save();
-      });
-
-      // NOTE: textTokenObjects here are not equivalent to textTokenIds!
-      // Only returns current page of texts
-      res.json({
-        matches: matchedTokens.filter((t) =>
-          savedTextIds.includes(t.textId.toString())
-        ).length,
-        textTokenObjects: Object.assign(
-          {},
-          ...texts
-            .filter((text) => req.body.textIds.includes(text._id.toString()))
-            .map((text) => formatTextOutput(text))
-        ),
-      });
-    } else {
-      let text = await Text.findById({ _id: req.body.textId }).populate(
-        "tokens.token"
-      );
-
-      // console.log("text", text);
-      // console.log("text tokens before mod", text.tokens.length);
-
-      // reindex remaining tokens
-      text.tokens = text.tokens
-        .filter((t) => t.token._id != req.body.tokenId)
-        .map((t, index) => ({ index: index, token: t.token }));
-
-      // console.log("text tokens after mod", text.tokens.length);
-      // console.log("text tokens", text.tokens);
-
-      // Update text
-      text.save();
-
-      // Delete old tokens (TODO: investigate whether soft delete is better)
-      await Token.findByIdAndDelete({ _id: req.body.tokenId });
-
-      res.json({ matches: 1, textTokenObjects: formatTextOutput(text) });
+      if (annotation) {
+        if (annotation.isSuggestion) {
+          // If replacement suggestion, it will be converted into replacement
+          await Annotations.updateOne(
+            {
+              _id: annotation._id,
+            },
+            { $set: { isSuggestion: false } }
+          );
+          textTokenIds = { [textId]: [tokenId] };
+          annotations.push({ dummy: "token" });
+        }
+      } else {
+        // Create annotation
+        await Annotations.create({
+          type: "replacement",
+          userId,
+          textId,
+          tokenId,
+          value: req.body.replacement,
+        });
+        textTokenIds = { [textId]: [tokenId] };
+        annotations.push({ dummy: "token" });
+      }
     }
+    res.json({
+      matches: annotations.length,
+      textTokenIds,
+    });
   } catch (error) {
     res.json({ details: error });
   }
 });
 
+/**
+ * Token replacement delete.
+ * if user deletes replacement suggestion, do not apply to replacements, only suggestions.
+ * If the user applyAll deletes a replacement, delete replacement suggestions too.
+ */
+router.patch("/delete", async (req, res) => {
+  logger.info("Deleting token replacement(s).", {
+    route: `/api/token/delete`,
+    body: req.body,
+  });
+
+  try {
+    const userId = req.userId;
+
+    const { textId, tokenId, projectId, applyAll, originalValue } = req.body;
+    let annotations = [];
+    let textTokenIds = {};
+
+    if (applyAll) {
+      const matchingTokens = await Text.aggregate(
+        textTokenSearchPipeline({
+          projectId: mongoose.Types.ObjectId(projectId),
+          searchTerm: originalValue,
+        })
+      );
+
+      // console.log("matchingTokens: ", matchingTokens);
+
+      const matchingTokenIds = matchingTokens.map((t) =>
+        mongoose.Types.ObjectId(t.tokenId)
+      );
+      const focusTokenAnnotation = await Annotations.findOne({
+        userId,
+        tokenId,
+      }).lean();
+      const focusTokenIsSuggestion = focusTokenAnnotation?.isSuggestion;
+      // console.log("focusTokenIsSuggestion: ", focusTokenIsSuggestion);
+
+      let queryConditions = { userId, tokenId: { $in: matchingTokenIds } };
+      if (focusTokenIsSuggestion !== undefined) {
+        // Directly use the boolean value of focusTokenIsSuggestion
+        queryConditions.isSuggestion = focusTokenIsSuggestion;
+      } else {
+        // When focusTokenIsSuggestion is undefined, check for existence
+        queryConditions.isSuggestion = { $exists: true };
+      }
+
+      annotations = await Annotations.find(queryConditions).lean();
+
+      // console.log("annotations: ", annotations);
+
+      await Annotations.deleteMany({
+        _id: { $in: annotations.map((a) => a._id) },
+      });
+
+      textTokenIds = annotations.reduce((acc, annotation) => {
+        (acc[annotation.textId] ??= []).push(annotation.tokenId);
+        return acc;
+      }, {});
+    } else {
+      await Annotations.deleteMany({
+        userId,
+        tokenId,
+        textId,
+        type: "replacement",
+      });
+      textTokenIds = { [textId]: [tokenId] };
+    }
+    res.json({ matches: annotations.length || 1, textTokenIds });
+  } catch (error) {
+    logger.error("Error in delete operation", { error });
+    res.status(500).json({ message: "Error processing delete operation." });
+  }
+});
+
+/**
+ * Converts `isSuggestion` to false on type: 'replacement' annotations.
+ */
+router.patch("/accept", async (req, res) => {
+  logger.info("Accepting token replacement(s).", {
+    route: `/api/token/accept`,
+    body: req.body,
+  });
+
+  try {
+    const userId = req.userId;
+
+    const { textId, tokenId, projectId, applyAll, originalValue } = req.body;
+    let annotations = [];
+    let textTokenIds = {};
+
+    if (applyAll) {
+      const matchingTokens = await Text.aggregate(
+        textTokenSearchPipeline({
+          projectId: mongoose.Types.ObjectId(projectId),
+          searchTerm: originalValue,
+        })
+      );
+
+      const matchingTokenIds = matchingTokens.map((t) =>
+        mongoose.Types.ObjectId(t.tokenId)
+      );
+
+      // console.log("matchingTokenIds: ", matchingTokenIds);
+
+      const annotationsToUpdate = await Annotations.find({
+        userId,
+        tokenId: {
+          $in: matchingTokenIds,
+        },
+        type: "replacement",
+        isSuggestion: true,
+      }).lean();
+
+      await Annotations.updateMany(
+        {
+          _id: { $in: annotationsToUpdate.map((a) => a._id) },
+        },
+        { $set: { isSuggestion: false } }
+      );
+
+      textTokenIds = annotationsToUpdate.reduce((acc, annotation) => {
+        (acc[annotation.textId] ??= []).push(annotation.tokenId);
+        return acc;
+      }, {});
+
+      annotations = annotationsToUpdate;
+    } else {
+      await Annotations.updateOne(
+        { userId, tokenId, textId, type: "replacement" },
+        { $set: { isSuggestion: false } }
+      );
+      textTokenIds = { [textId]: [tokenId] };
+    }
+
+    res.json({
+      matches: annotations.length || 1,
+      textTokenIds,
+    });
+  } catch (error) {
+    logger.error("Error in accept operation", { error });
+    res.status(500).json({ message: "Error processing accept operation." });
+  }
+});
+
+// router.patch("/split", async (req, res) => {
+//   /**
+//    * Splits a given token into `n` new tokens based on introduced whitespace.
+//    * TODO: Investigate how to classify tokens as IV/OOV without long load time of English lexicon.
+//    */
+//   try {
+//     console.log(req.body);
+
+//     let text = await Text.findById({ _id: req.body.textId });
+
+//     const tokenIndex = req.body.tokenIndex;
+
+//     // const enMap = await Resource.findOne({ type: "en" }).lean();
+//     // const enMapSet = new Set(enMap.tokens);
+
+//     // console.log("enMap token size", enMap.tokens.length);
+
+//     // Here all historical information will be stripped from new tokens, however they will be
+//     // checked for if they are OOV
+//     const newTokenList = req.body.currentValue.split(" ").map((token) => ({
+//       value: token,
+//       // active: true,
+//       tags: { en: false }, // enMapSet.has(token)
+//       replacement: null,
+//       suggestion: null,
+//       projectId: text.projectId,
+//       textId: text._id,
+//     }));
+
+//     // console.log("new tokens", newTokenList);
+
+//     // Save new tokens to db
+//     const tokenListRes = await Token.insertMany(newTokenList);
+
+//     // Delete old tokens (TODO: investigate whether soft delete is better)
+//     await Token.findByIdAndDelete({ _id: req.body.tokenId });
+
+//     // Update old and new token indexes
+//     const tokensToAdd = tokenListRes.map((token, index) => ({
+//       token: token._id,
+//       index: tokenIndex + index, // give new tokens index which is offset by the original tokens index
+//     }));
+
+//     // Insert new tokens - NOTE: this happens in place on the text object.
+//     text.tokens.splice(tokenIndex, 1, ...tokensToAdd);
+
+//     // Reassign indexes based on current ordering
+//     text.tokens = text.tokens.map((token, newIndex) => ({
+//       ...token,
+//       index: newIndex,
+//     }));
+
+//     // Update text
+//     // text.save();
+
+//     await Text.findByIdAndUpdate(
+//       { _id: req.body.textId },
+//       { tokens: text.tokens },
+//       {
+//         new: true,
+//       }
+//     );
+
+//     text = await Text.findById({ _id: req.body.textId })
+//       .populate("tokens.token")
+//       .lean();
+
+//     res.json(formatTextOutput(text));
+//   } catch (error) {
+//     console.log(`Error occurred when splitting token - ${error}`);
+//     res.json({ details: error });
+//   }
+// });
+
+// router.patch("/remove", async (req, res) => {
+//   /**
+//    * Removes a given token from a text
+//    * TODO: Handle when only one token on text. Don't let user delete it, replace token content with empty string.
+//    */
+//   try {
+//     if (req.body.applyAll) {
+//       const focusToken = await Token.findById({ _id: req.body.tokenId }).lean();
+
+//       const matchedTokens = await Token.find({
+//         projectId: focusToken.projectId,
+//         value: focusToken.value,
+//       }).lean();
+
+//       console.log("matchedTokens", matchedTokens);
+
+//       const matchedTextIds = matchedTokens.map((t) => t.textId);
+
+//       let texts = await Text.find({
+//         _id: { $in: matchedTextIds },
+//         $or: [
+//           {
+//             saved: false, // Exclude user saved texts
+//             _id: focusToken.textId,
+//           },
+//         ],
+//       }).populate("tokens.token");
+
+//       let savedTextIds = texts.map((t) => t._id.toString());
+
+//       console.log("savedTextIds", savedTextIds);
+
+//       texts.forEach((text) => {
+//         text.tokens = text.tokens
+//           .filter((t) => t.token.value !== focusToken.value)
+//           .map((t, index) => ({ index: index, token: t.token }));
+
+//         text.save();
+//       });
+
+//       // NOTE: textTokenObjects here are not equivalent to textTokenIds!
+//       // Only returns current page of texts
+//       res.json({
+//         matches: matchedTokens.filter((t) =>
+//           savedTextIds.includes(t.textId.toString())
+//         ).length,
+//         textTokenObjects: Object.assign(
+//           {},
+//           ...texts
+//             .filter((text) => req.body.textIds.includes(text._id.toString()))
+//             .map((text) => formatTextOutput(text))
+//         ),
+//       });
+//     } else {
+//       let text = await Text.findById({ _id: req.body.textId }).populate(
+//         "tokens.token"
+//       );
+
+//       // console.log("text", text);
+//       // console.log("text tokens before mod", text.tokens.length);
+
+//       // reindex remaining tokens
+//       text.tokens = text.tokens
+//         .filter((t) => t.token._id != req.body.tokenId)
+//         .map((t, index) => ({ index: index, token: t.token }));
+
+//       // console.log("text tokens after mod", text.tokens.length);
+//       // console.log("text tokens", text.tokens);
+
+//       // Update text
+//       text.save();
+
+//       // Delete old tokens (TODO: investigate whether soft delete is better)
+//       await Token.findByIdAndDelete({ _id: req.body.tokenId });
+
+//       res.json({ matches: 1, textTokenObjects: formatTextOutput(text) });
+//     }
+//   } catch (error) {
+//     res.json({ details: error });
+//   }
+// });
+
+/**
+ *
+ */
 router.post("/search", async (req, res) => {
   /**
    * Searches tokens to find matches on some value.
    * NOTE: Currently limited to replacement matches
    */
   try {
-    const matchedTokens = await Token.find(
-      {
-        projectId: req.body.projectId,
-        value: req.body.value,
-        replacement: { $ne: null },
+    const userId = req.userId;
+    const { projectId, value } = req.body;
+
+    console.log(projectId, userId, value);
+
+    // Find matching tokens across corpus on their original value
+    const matchingTokens = await Text.aggregate(
+      textTokenSearchPipeline({
+        projectId,
+        searchTerm: value,
+      })
+    );
+
+    console.log("matchingTokens: ", matchingTokens);
+
+    const annotations = await Annotations.find({
+      userId,
+      tokenId: {
+        $in: matchingTokens.map((t) => mongoose.Types.ObjectId(t.tokenId)),
       },
-      { replacement: 1, _id: 0 }
-    ).lean();
+    });
 
-    // Get counts of replacements
-    const output = matchedTokens
-      .map((t) => t.replacement)
-      .reduce(function (acc, curr) {
-        return acc[curr] ? ++acc[curr] : (acc[curr] = 1), acc;
-      }, {});
+    console.log("annotations: ", annotations);
 
-    res.json({ replacements: output });
+    // Step 1: Aggregate the data
+    const aggregation = annotations.reduce(
+      (acc, { type, isSuggestion, value }) => {
+        const key = `${type}-${isSuggestion}`;
+        if (!acc[key]) {
+          acc[key] = { type, isSuggestion, values: {} };
+        }
+        acc[key].values[value] = (acc[key].values[value] || 0) + 1;
+        return acc;
+      },
+      {}
+    );
+
+    // Step 2: Transform the aggregation into the desired output format
+    const result = Object.values(aggregation).map(
+      ({ type, isSuggestion, values }) => ({
+        type,
+        isSuggestion,
+        matches: values,
+      })
+    );
+
+    res.json(result);
   } catch (error) {
     console.log(`Error ${error}`);
     res.json({ details: error });
   }
 });
 
-// --- Tags for Token Classification Multi-task ---
-
-router.patch("/meta/add/single", async (req, res) => {
-  // Patch tag on one token
+/**
+ * Add entity label to token(s).
+ */
+router.patch("/label/add", async (req, res) => {
   try {
-    const tokenResponse = await Token.findById({
-      _id: req.body.tokenId,
-    }).lean();
+    const userId = req.userId;
 
-    const updatedTags = {
-      ...tokenResponse.tags,
-      [req.body.entityLabelId]: true,
-    };
+    let { projectId, textId, tokenId, entityLabelId, applyAll } = req.body;
 
-    await Token.findByIdAndUpdate(
-      { _id: req.body.tokenId },
-      {
-        tags: updatedTags,
-      },
-      { upsert: true }
-    ).lean();
+    textId = mongoose.Types.ObjectId(textId);
+    tokenId = mongoose.Types.ObjectId(tokenId);
+    entityLabelId = mongoose.Types.ObjectId(entityLabelId);
 
-    res.json(updatedTags);
-  } catch (err) {
-    res.json({ message: err });
-  }
-});
+    let textTokenIds = {};
+    let originalValue;
 
-// Patch meta-tags on all tokens
-router.patch("/meta/add/many/:projectId", async (req, res) => {
-  // Takes in field, value pair where the field is the meta-tag information key
-  // Updates all values in data set that match with meta-tag boolean
-  try {
-    const originalTokenValue = req.body.original_token;
-    const metaTag = req.body.field;
-    const metaTagValue = req.body.value;
-
-    // Get all tokens that match body token
-    const tokenResponse = await Token.find({
-      projectId: req.params.projectId,
-      value: originalTokenValue,
-    }).lean();
-
-    const updateTokens = tokenResponse.map((token) => ({
-      updateOne: {
-        filter: { _id: token._id },
-        update: {
-          tags: { ...token.tags, [metaTag]: metaTagValue },
+    if (applyAll) {
+      const replacement = await Annotations.findOne(
+        {
+          userId,
+          textId,
+          tokenId,
+          type: "replacement",
         },
-        upsert: true,
-      },
-    }));
+        { value: 1 }
+      ).lean();
 
-    await Token.bulkWrite(updateTokens);
+      if (replacement) {
+        // Match on replacement (current value)
+        originalValue = replacement.value;
+        console.log("token has replacement: ", originalValue);
+      } else {
+        // Match on original value...
+        const focusTokenResults = await Text.aggregate(
+          singleTokenFromTextPipeline({ textId, tokenId })
+        );
+        const focusToken = focusTokenResults[0] || null;
+        if (focusToken) {
+          originalValue = focusToken.value;
+        }
+      }
 
-    // Update text annotation states
+      if (!originalValue) {
+        return res
+          .status(404)
+          .json({ message: "Original value for token not found." });
+      }
 
-    res.json({ matches: tokenResponse.length });
+      let matchingTokens = await Text.aggregate(
+        textTokenSearchPipeline({
+          projectId,
+          excludeTokenIds: [tokenId.toString()],
+          searchTerm: originalValue,
+        })
+      );
+
+      // Check for matching tokens by replacement value too
+      const matchingTokensAnnotation = await Annotations.find({
+        userId,
+        type: "replacement",
+        value: originalValue,
+        tokenId: { $ne: tokenId },
+      }).lean();
+
+      console.log("matchingTokensAnnotation: ", matchingTokensAnnotation);
+
+      matchingTokens = [...matchingTokens, ...matchingTokensAnnotation];
+
+      // Exclude tokens already labeled
+      const labeledTokenIds = new Set(
+        (
+          await Annotations.find(
+            {
+              userId,
+              type: "tag",
+              value: entityLabelId,
+              tokenId: { $in: matchingTokens.map((t) => t.tokenId) },
+            },
+            "tokenId"
+          ).lean()
+        ).map((a) => a.tokenId.toString())
+      );
+
+      const tokensToUpdate = matchingTokens.filter(
+        (t) => !labeledTokenIds.has(t.tokenId.toString())
+      );
+
+      const annotationUpdateObjs = tokensToUpdate.map((token) => {
+        const tokenTextId = token.textId.toString();
+        const tokenTokenId = token.tokenId.toString();
+
+        if (textTokenIds[tokenTextId]) {
+          textTokenIds[tokenTextId].push(tokenTokenId);
+        } else {
+          textTokenIds[tokenTextId] = [tokenTokenId];
+        }
+
+        return {
+          insertOne: {
+            document: {
+              userId,
+              textId: mongoose.Types.ObjectId(tokenTextId),
+              tokenId: mongoose.Types.ObjectId(tokenTokenId),
+              type: "tag",
+              value: entityLabelId,
+            },
+          },
+        };
+      });
+
+      const result = await Annotations.bulkWrite(annotationUpdateObjs);
+      return res.json({
+        matches: result.insertedCount,
+        textTokenIds,
+      });
+    } else {
+      const existingAnnotation = await Annotations.findOne({
+        textId,
+        userId,
+        tokenId,
+        value: entityLabelId,
+        type: "tag",
+      });
+
+      if (!existingAnnotation) {
+        await Annotations.create({
+          textId,
+          userId,
+          tokenId,
+          value: entityLabelId,
+          type: "tag",
+        });
+        return res.json({ matches: 1, textTokenIds: { [textId]: [tokenId] } });
+      }
+      return res
+        .status(400)
+        .json({ message: "Label already exists on this token." });
+    }
   } catch (err) {
-    res.json({ message: err });
+    logger.error("Error in /label/add route", err);
+    return res.status(500).json({ message: "An error occurred." });
   }
 });
 
-// Removes meta-tag from one token
-router.patch("/meta/remove/one/:tokenId", async (req, res) => {
+/**
+ * Delete label from token.
+ * TODO: Review whether tags should have suggestions and whether they should follow
+ *       the same logic as token transformations.
+ */
+router.patch("/label/delete", async (req, res) => {
   try {
-    const tokenResponse = await Token.findById({
-      _id: req.params.tokenId,
-    }).lean();
+    const userId = req.userId;
+    let { textId, tokenId, applyAll, entityLabelId, projectId } = req.body;
 
-    // Filter out the key to be removed.
-    const filteredTags = Object.keys(tokenResponse.tags)
-      .filter((key) => key !== req.body.entityLabelId)
-      .reduce((res, key) => {
-        res[key] = tokenResponse.tags[key];
-        return res;
+    textId = mongoose.Types.ObjectId(textId);
+    tokenId = mongoose.Types.ObjectId(tokenId);
+    entityLabelId = mongoose.Types.ObjectId(entityLabelId);
+
+    let textTokenIds = {};
+    let originalValue;
+
+    if (applyAll) {
+      // Find all annoations of similar type and remove
+      const replacement = await Annotations.findOne(
+        {
+          userId,
+          textId,
+          tokenId,
+          type: "replacement",
+        },
+        { value: 1 }
+      ).lean();
+
+      if (replacement) {
+        // Match on replacement (current value)
+        originalValue = replacement.value;
+      } else {
+        // Match on original value...
+        const focusTokenResults = await Text.aggregate(
+          singleTokenFromTextPipeline({ textId, tokenId })
+        );
+        const focusToken = focusTokenResults[0] || null;
+
+        if (focusToken) {
+          originalValue = focusToken.value;
+        }
+      }
+
+      if (!originalValue) {
+        return res
+          .status(404)
+          .json({ message: "Original value for token not found." });
+      }
+
+      let matchingTokens = await Text.aggregate(
+        textTokenSearchPipeline({
+          projectId,
+          excludeTokenIds: [tokenId.toString()],
+          searchTerm: originalValue,
+        })
+      );
+
+      const matchingTokensAnnotation = await Annotations.find({
+        userId,
+        type: "replacement",
+        value: originalValue,
+        tokenId: { $ne: tokenId },
+      }).lean();
+
+      console.log("matchingTokensAnnotation: ", matchingTokensAnnotation);
+
+      matchingTokens = [...matchingTokens, ...matchingTokensAnnotation];
+
+      const matchingTokenIds = matchingTokens.map((t) =>
+        mongoose.Types.ObjectId(t.tokenId)
+      );
+
+      const result = await Annotations.deleteMany({
+        userId,
+        tokenId: { $in: [...matchingTokenIds, tokenId] },
+        type: "tag",
+        value: entityLabelId,
+      });
+
+      textTokenIds = matchingTokens.reduce((acc, token) => {
+        (acc[token.textId] ??= []).push(token.tokenId);
+        return acc;
       }, {});
 
-    await Token.findByIdAndUpdate(
-      { _id: req.params.tokenId },
-      {
-        tags: filteredTags,
-      },
-      { upsert: true }
-    ).lean();
+      // Add focus token to textTokenIds
+      if (textTokenIds[textId]) {
+        textTokenIds[textId].push(tokenId);
+      } else {
+        textTokenIds[textId] = [tokenId];
+      }
 
-    res.json(filteredTags);
+      res.json({ matches: result.deletedCount, textTokenIds });
+    } else {
+      await Annotations.deleteOne({
+        userId,
+        textId,
+        tokenId,
+        value: entityLabelId,
+        type: "tag",
+      });
+      res.json({ matches: 1, textTokenIds: { [textId]: [tokenId] } });
+    }
   } catch (error) {
     console.log(error);
     res.json({ message: error });
   }
 });
 
-// Removes meta tag from all tokens with similar original value
-// TODO: review whether matches should be on the original value and replacement values of
-// tokens
-router.patch("/meta/remove/many/:projectId", async (req, res) => {
-  try {
-    const originalTokenValue = req.body.original_token;
-    const metaTag = req.body.field;
-    const metaTagValue = req.body.value;
-
-    // Get all tokens that match body token
-    const tokenResponse = await Token.find({
-      projectId: req.params.projectId,
-      value: originalTokenValue,
-    });
-
-    // console.log(tokenResponse);
-
-    const updateTokens = tokenResponse.map((token) => ({
-      updateOne: {
-        filter: { _id: token._id },
-        update: {
-          tags: { ...token.tags, [metaTag]: metaTagValue },
-        },
-        upsert: true,
-      },
-    }));
-
-    await Token.bulkWrite(updateTokens);
-
-    res.json({ matches: tokenResponse.length });
-  } catch (err) {
-    res.json({ message: err });
-  }
-});
-
-module.exports = router;
+export default router;
