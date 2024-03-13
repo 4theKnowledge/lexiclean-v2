@@ -1,5 +1,14 @@
 import { useState, useEffect } from "react";
-import { Grid, Typography, Box, Divider, Paper, Chip } from "@mui/material";
+import {
+  Grid,
+  Typography,
+  Box,
+  Divider,
+  Paper,
+  Chip,
+  Stack,
+  Button,
+} from "@mui/material";
 import LoadingButton from "@mui/lab/LoadingButton";
 import Details from "./steps/Details";
 import Upload from "./steps/upload/Upload";
@@ -17,6 +26,7 @@ import {
   ValidateCreateReview,
 } from "../../shared/utils/validation";
 import useProjectActions from "../../shared/hooks/api/project";
+import Flags from "./steps/Flags";
 
 const CreateProject = () => {
   const { createProject } = useProjectActions();
@@ -27,6 +37,7 @@ const CreateProject = () => {
     schema: false,
     upload: false,
     preprocessing: false,
+    flags: true,
     preannotation: false,
     review: false,
   });
@@ -35,9 +46,10 @@ const CreateProject = () => {
     setStepValidation((prevState) => ({ ...prevState, [step]: valid }));
   };
 
-  const [values, setValues] = useState({
+  const initialState = {
     projectName: "",
     projectDescription: "",
+    specialTokens: "",
     corpusType: "scratch", // Indicates type of data uploaded ('scratch', 'identifiers', 'parallel')
     corpusFileName: null,
     corpus: [],
@@ -48,9 +60,15 @@ const CreateProject = () => {
     replacementDictionary: {},
     replacementDictionaryFileName: null,
     tags: [],
+    flags: [],
     preannotationDigitsIV: false,
-    specialTokens: "",
-  });
+  };
+
+  const [values, setValues] = useState(initialState);
+
+  const handleReset = () => {
+    setValues(initialState);
+  };
 
   const updateValue = (key, value) => {
     setValues((prevState) => ({ ...prevState, [key]: value }));
@@ -80,6 +98,12 @@ const CreateProject = () => {
       description: "Apply text preprocessing to your corpus",
       title: "Preprocessing",
       valid: stepValidation.preprocessing,
+    },
+    flags: {
+      component: <Flags values={values} updateValue={updateValue} />,
+      description: "Specify a set of flags which can be applied to texts",
+      title: "Flags",
+      valid: stepValidation.flags,
     },
     preannotation: {
       component: <Preannotation values={values} updateValue={updateValue} />,
@@ -142,34 +166,56 @@ const CreateProject = () => {
   };
 
   return (
-    <Grid container spacing={2} mt={4}>
-      {Object.values(steps).map((s) => (
-        <Grid item xs={12}>
-          <StepContainer title={s.title} valid={s.valid}>
-            {s.component}
-          </StepContainer>
-        </Grid>
-      ))}
-      <Box
-        p={2}
-        margin="auto"
-        display="flex"
-        flexDirection="column"
-        alignItems="center"
+    <Grid
+      container
+      direction="column"
+      sx={{ height: "calc(100vh - 128px)", overflow: "hidden" }}
+    >
+      <Grid
+        container
+        item
+        xs
+        sx={{ overflow: "auto" }}
+        spacing={4}
+        mt={1}
+        mb={1}
       >
-        <Typography variant="body2" gutterBottom>
-          Project creation may take a few minutes if a lot of data has been
-          uploaded
-        </Typography>
-        <LoadingButton
-          variant="contained"
-          loading={isSubmitting}
-          onClick={handleSubmit}
-          disabled={!stepValidation.review}
-        >
-          Create Project
-        </LoadingButton>
-      </Box>
+        {Object.values(steps).map((s) => (
+          <Grid item xs={12}>
+            <StepContainer title={s.title} valid={s.valid}>
+              {s.component}
+            </StepContainer>
+          </Grid>
+        ))}
+      </Grid>
+      {/* STICKY FOOTER */}
+      <Grid item xs="auto">
+        <Paper variant="outlined">
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+            p="0.5rem 1rem"
+            spacing={1}
+          >
+            <Typography variant="body2">
+              Note: Project creation may take a few minutes if a lot of data has
+              been uploaded
+            </Typography>
+            <Stack direction="row" spacing={2}>
+              <LoadingButton
+                variant="contained"
+                loading={isSubmitting}
+                onClick={handleSubmit}
+                disabled={!stepValidation.review}
+              >
+                Create Project
+              </LoadingButton>
+              <Button onClick={handleReset}>Start Over</Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      </Grid>
     </Grid>
   );
 };
