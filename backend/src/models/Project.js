@@ -3,7 +3,7 @@ const Schema = mongoose.Schema;
 
 const ProjectSchema = mongoose.Schema(
   {
-    user: {
+    owner: {
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
