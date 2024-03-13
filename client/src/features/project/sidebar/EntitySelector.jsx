@@ -18,14 +18,14 @@ const EntitySelector = () => {
 
   const disabled = !state.selectedToken || !state.selectedToken.value;
 
-  const tokenTags = state.selectedToken
-    ? Object.entries(state.selectedToken.tags)
-        .filter(([key, active]) => active)
-        .map(([key, _]) => key)
-    : [];
+  const tokenTags = state?.selectedToken?.tags ?? [];
 
   const handleApply = async ({ tokenId, entityLabelId }) => {
-    await applyLabelAction({ tokenId, entityLabelId });
+    await applyLabelAction({
+      textId: state.selectedTextId,
+      tokenId,
+      entityLabelId,
+    });
   };
 
   return (
