@@ -1,9 +1,20 @@
-require("dotenv").config({ path: "./.env" });
-const express = require("express");
+import dotenv from "dotenv";
+dotenv.config({ path: "./.env" });
+
+import express from "express";
+import cors from "cors";
+import mongoose from "mongoose";
+import { auth } from "express-oauth2-jwt-bearer";
+
+import projectRoute from "./routes/project.js";
+import textRoute from "./routes/text.js";
+import tokenRoute from "./routes/token.js";
+import schemaRoute from "./routes/schema.js";
+import userRoute from "./routes/user.js";
+
+import { authenticateUser, projectAccessCheck } from "./middleware/auth.js";
+
 const app = express();
-const cors = require("cors");
-const mongoose = require("mongoose");
-const { auth } = require("express-oauth2-jwt-bearer");
 
 const checkJwt = auth({
   audience: `https://${process.env.AUTH0_AUDIENCE}`,
@@ -16,12 +27,20 @@ app.use(express.urlencoded({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: "50mb" }));
 
-// Routes
-app.use("/api/project", checkJwt, [require("./routes/project")]);
-app.use("/api/token", checkJwt, [require("./routes/token")]);
-app.use("/api/text", checkJwt, [require("./routes/text")]);
-app.use("/api/schema", checkJwt, [require("./routes/schema")]);
-app.use("/api/user", checkJwt, [require("./routes/user")]);
+// Custom middleware
+app.use(authenticateUser);
+
+// Applying JWT check globally
+app.use(checkJwt);
+
+// Applying project access check to routes that need it
+app.use("/api/project", projectRoute);
+app.use("/api/token", projectAccessCheck, tokenRoute);
+app.use("/api/text", projectAccessCheck, textRoute);
+app.use("/api/schema", projectAccessCheck, schemaRoute);
+
+// User route might not require project access check
+app.use("/api/user", userRoute);
 
 // Simple health check
 app.get("/health", (req, res) => {
@@ -40,13 +59,10 @@ app.use((err, req, res, next) => {
 const DB_URI = process.env.DB_URI;
 console.log(`DB_URI: ${DB_URI}`);
 
-mongoose.connect(
-  DB_URI,
-  { useNewUrlParser: true, useUnifiedTopology: true },
-  () => {
-    console.log("[server] Connected to db");
-  }
-);
+mongoose
+  .connect(DB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
+  .then(() => console.log("[server] Connected to db"))
+  .catch((err) => console.error(err));
 
 // Create listener
 const port = process.env.PORT || 3001;
