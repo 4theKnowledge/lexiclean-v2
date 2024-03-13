@@ -102,12 +102,33 @@ const useDashboardActions = () => {
     }
   };
 
+  const updateProjectFlags = async ({ projectId, flags }) => {
+    try {
+      const data = await callApi(`/api/project/${projectId}/flags`, {
+        method: "PATCH",
+        data: {
+          projectId,
+          flags,
+        },
+      });
+
+      return data;
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Failed to modify project flags: ${error}`,
+        severity: "error",
+      });
+    }
+  };
+
   return {
     fetchProjectSummaryById,
     downloadProjectData,
     deleteProjectById,
     updateProjectSchema,
     updateProjectDetail,
+    updateProjectFlags,
   };
 };
 
