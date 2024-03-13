@@ -25,7 +25,7 @@ import { useAppContext } from "../../shared/context/AppContext";
 import useProjectActions from "../../shared/hooks/api/project";
 import FlagIcon from "@mui/icons-material/Flag";
 import { useParams } from "react-router-dom";
-import { flagOptions } from "../../shared/constants/project";
+import useAnnotationActions from "../../shared/hooks/api/annotation";
 
 const ActionTray = ({ textId, textIndex }) => {
   const [state, dispatch] = useContext(ProjectContext);
@@ -135,41 +135,49 @@ const ActionTray = ({ textId, textIndex }) => {
         </Tooltip>
         <Tooltip
           title={
-            state.tokenizeTextId === textId
-              ? "Click to cancel concatenation"
-              : "Click to concatenate tokens"
+            "Concatenation is currently unavailable"
+            // state.tokenizeTextId === textId
+            //   ? "Click to cancel concatenation"
+            //   : "Click to concatenate tokens"
           }
           placement="top"
         >
+          <span>
+            <Chip
+              clickable
+              disabled
+              // disabled={
+              //   state.tokenizeTextId !== null && state.tokenizeTextId !== textId
+              // }
+              label="Concatenate"
+              size="small"
+              icon={<JoinFullIcon />}
+              color={state.tokenizeTextId === textId ? "primary" : "default"}
+              variant={
+                state.tokenizeTextId === textId ? "contained" : "outlined"
+              }
+              onClick={handleTokenizeText}
+            />
+          </span>
+        </Tooltip>
+        <TrayChip textId={textId} />
+        <Divider orientation="vertical" flexItem />
+        <Tooltip title="Click to get AI suggestion" placement="top">
           <Chip
             clickable
-            label="Concatenate"
+            label="AI Suggestion"
             size="small"
-            icon={<JoinFullIcon />}
-            color={state.tokenizeTextId === textId ? "primary" : "default"}
-            variant={state.tokenizeTextId === textId ? "contained" : "outlined"}
-            onClick={handleTokenizeText}
-            disabled={
-              state.tokenizeTextId !== null && state.tokenizeTextId !== textId
+            color="primary"
+            icon={
+              loadingSuggestion ? (
+                <CircularProgress size={16} />
+              ) : (
+                <AutoAwesomeIcon />
+              )
             }
+            onClick={handleAISuggestion}
           />
         </Tooltip>
-        <TrayChip />
-        <Divider orientation="vertical" flexItem />
-        <Chip
-          clickable
-          label="AI Suggestion"
-          size="small"
-          color="primary"
-          icon={
-            loadingSuggestion ? (
-              <CircularProgress size={16} />
-            ) : (
-              <AutoAwesomeIcon />
-            )
-          }
-          onClick={handleAISuggestion}
-        />
       </Stack>
       <Stack
         direction="row"
@@ -220,7 +228,9 @@ const ActionTray = ({ textId, textIndex }) => {
   );
 };
 
-const TrayChip = () => {
+const TrayChip = ({ textId }) => {
+  const [state, dispatch] = useContext(ProjectContext);
+  const { addFlag, deleteFlag } = useAnnotationActions();
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
   const handleOpen = (event) => {
@@ -231,11 +241,27 @@ const TrayChip = () => {
     setAnchorEl(null);
   };
 
+  const handleFlagClick = async (event) => {
+    const flagIndex = event.target.value;
+
+    const flagId = state.project.flags[flagIndex]._id;
+
+    if (state.texts[textId].flags.includes(flagId)) {
+      // if flag exists, delete
+      // console.log("flag exists");
+      await deleteFlag({ textId, flagId });
+    } else {
+      // if flag doesn't exist, add
+      // console.log("flag not exist");
+      await addFlag({ textId, flagId });
+    }
+  };
+
   return (
     <>
-      <Tooltip title="Click to modify flag(s) on this text" placement="top">
+      <Tooltip title="Click to add/remove flag(s) on this text" placement="top">
         <Badge
-          // badgeContent={state.texts[textId].flags.length}
+          badgeContent={state.texts[textId].flags.length}
           max={9}
           color="primary"
         >
@@ -244,13 +270,8 @@ const TrayChip = () => {
             label="Flags"
             size="small"
             icon={<FlagIcon />}
-            // color={state.tokenizeTextId === textId ? "primary" : "default"}
             variant={"outlined"}
             onClick={handleOpen}
-            disabled
-            // disabled={
-            //   state.tokenizeTextId !== null && state.tokenizeTextId !== textId
-            // }
           />
         </Badge>
       </Tooltip>
@@ -263,12 +284,13 @@ const TrayChip = () => {
         anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
       >
         <MenuList dense>
-          {flagOptions.map((option, index) => (
+          {state.project.flags.map((option, index) => (
             <FlagMenuItem
-              // state={state}
-              // textId={textId}
-              option={option}
-              // onClick={handleClick}
+              state={state}
+              textId={textId}
+              option={option._id}
+              label={option.name}
+              onClick={handleFlagClick}
               index={index}
             />
           ))}
@@ -278,22 +300,21 @@ const TrayChip = () => {
   );
 };
 
-const FlagMenuItem = ({ state, textId, option, onClick, index }) => {
-  // const hasFlag =
-  //   state.texts[textId].flags.filter((f) => f.state === option).length === 1;
+const FlagMenuItem = ({ state, textId, option, label, onClick, index }) => {
+  const hasFlag = state.texts[textId].flags.includes(option);
 
   return (
     <Tooltip
-      // title={`Click to ${hasFlag ? "remove" : "apply"} ${option} flag`}
+      title={`Click to ${hasFlag ? "remove" : "apply"} ${label} flag`}
       placement="right"
     >
       <MenuItem
-        // onClick={onClick}
+        onClick={onClick}
         sx={{ textTransform: "capitalize" }}
-        // value={index}
-        // selected={hasFlag}
+        value={index}
+        selected={hasFlag}
       >
-        {option}
+        {label}
       </MenuItem>
     </Tooltip>
   );
