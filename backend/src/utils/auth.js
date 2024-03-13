@@ -1,5 +1,8 @@
-module.exports = {
-  tokenGetUserId: function tokenGetUserId(authHeader) {
-    return "62fcb895cb80af185889372e";
-  },
+import { jwtDecode } from "jwt-decode";
+import User from "../models/User.js";
+
+export const tokenGetUserId = async (authHeader) => {
+  const user = jwtDecode(authHeader.replace("Bearer ", ""));
+  const userResponse = await User.findOne({ auth0Id: user.sub }).lean();
+  return userResponse._id;
 };
