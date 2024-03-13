@@ -1,47 +1,62 @@
-const express = require("express");
-const router = express.Router();
-const logger = require("../logger");
-const { tokenGetUserId } = require("../utils/auth");
-const Project = require("../models/Project");
-const Resource = require("../models/Resource");
-const Text = require("../models/Text");
-const Token = require("../models/Token");
-const projectUtils = require("../utils/project");
-const project = require("../utils/project");
-const { createAnnotatedTokens } = require("../services/project");
-const { normaliseSpecialTokens } = require("../utils/project");
-const {
+import express from "express";
+import logger from "../logger/index.js";
+import Project from "../models/Project.js";
+import Resource from "../models/Resource.js";
+import Text from "../models/Text.js";
+import Token from "../models/Token.js";
+import {
+  removeTabs,
+  removeCasing,
+  removeSpecialChars,
+  removeWhiteSpace,
+  removeDuplicates,
+  calculateTFIDF,
+} from "../utils/project.js";
+import { normaliseSpecialTokens } from "../utils/project.js";
+import {
   getReplacementFrequencies,
   formatOutputTexts,
-} = require("../utils/download");
+} from "../utils/download.js";
+import Annotations from "../models/Annotations.js";
+import mongoose from "mongoose";
+import {
+  projectAccessCheck,
+  projectManagementCheck,
+} from "../middleware/auth.js";
 
+const router = express.Router();
 const REPLACEMENT_COLOR = "#03a9f4";
 
 router.post("/create", async (req, res) => {
+  logger.info("Creating project", { route: "/api/project/create" });
   try {
-    logger.info("Creating project", { route: "/api/project/create" });
-    const userId = tokenGetUserId(req.headers["authorization"]);
+    const userId = req.userId;
+    console.log("userId: ", userId);
 
     const isParallelCorpusProject = req.body.corpusType === "parallel";
     const tags = req.body.tags;
     console.log("tags: ", tags);
 
-    let mapSets = {};
-    const enMap = await Resource.findOne({ type: "en" }).lean();
+    /**
+     * Load English lexicon (map shared for all projects) and
+     * create map sets used for pre-annotation of tokens
+     */
+    let enMap = await Resource.findOne({ type: "en" });
+    console.log(enMap._id);
+    const enMapId = enMap._id;
     console.log(`loaded en map with ${enMap.tokens.length} tokens`);
-    mapSets["en"] = new Set(enMap.tokens);
+    enMap = new Set(enMap.tokens);
 
     let specialTokens = req.body.specialTokens.trim();
     if (specialTokens) {
-      // Add special tokens to en map set
+      // Add special tokens to in-vocabulary English map. These will be considered in-vocabulary.
       specialTokens = normaliseSpecialTokens(specialTokens);
-      specialTokens.forEach((st) => mapSets["en"].add(st));
+      specialTokens.forEach((st) => enMap.add(st));
     } else {
       console.log("No special tokens provided or special tokens are empty.");
     }
 
-    // replacementDictionary
-
+    // Create resource for `replacementDictionary`
     const rpMap = await Resource.create({
       type: "rp",
       replacements: req.body.replacementDictionary,
@@ -49,32 +64,21 @@ router.post("/create", async (req, res) => {
     });
     console.log("rpMap", rpMap);
 
-    /**
-     * Load English lexicon (map shared for all projects) and
-     * create map sets used for pre-annotation of tokens
-     */
+    // Create resources for each user-specific tag. They may or may no have associated tokens/data.
 
-    const mapResponse = await Resource.insertMany(
-      tags.map((t) => ({ ...t, type: t.name }))
+    const tagResponse = await Resource.insertMany(
+      tags.map((t) => ({ ...t, type: t.name, tokens: t.data }))
     );
-    // const rpMap = mapResponse.filter((map) => map.type === "rp")[0]; // this should always be present in the maps
 
-    console.log("mapResponse: ", mapResponse);
+    console.log("tagResponse: ", tagResponse);
 
+    let tagSets = {};
     // Convert maps to Sets
-    if (0 < mapResponse.length) {
-      // mapSets = Object.assign(
-      //   ...mapResponse.map((map) => ({ [map.type]: new Set(map.tokens) }))
-      // ); // TODO: include construction of rp map instead of doing separately. use ternary.
-
-      const newMapSets = mapResponse.reduce((acc, map) => {
-        // acc[map.type] = new Set(map.tokens);
+    if (tagResponse.length > 0) {
+      tagSets = tagResponse.reduce((acc, map) => {
         acc[map._id] = new Set(map.tokens);
         return acc;
       }, {});
-
-      // Merge newMapSets with existing mapSets, preserving the 'en' map set
-      mapSets = { ...mapSets, ...newMapSets };
     }
 
     // console.log("mapSets", mapSets);
@@ -82,21 +86,18 @@ router.post("/create", async (req, res) => {
 
     // Create object from array of replacement tokens
     // (this is done as Mongo cannot store keys with . or $ tokens)
-    const rpObj = isParallelCorpusProject
-      ? {}
-      : rpMap.replacements.reduce(
-          (obj, item) => ({ ...obj, [item.original]: item.normed }),
-          {}
-        );
+    // const rpObj = isParallelCorpusProject
+    //   ? {}
+    //   : rpMap.replacements.reduce(
+    //       (obj, item) => ({ ...obj, [item.original]: item.normed }),
+    //       {}
+    //     );
 
-    // console.log("rpObj", rpObj);
-    mapSets["rp"] = new Set(Object.keys(rpObj));
-
-    console.log("mapSets", Object.keys(mapSets));
+    console.log("tagSets", tagSets);
 
     // Create base project
     const project = new Project({
-      user: userId,
+      owner: userId,
       name: req.body.projectName,
       description: req.body.projectDescription,
       parallelCorpus: isParallelCorpusProject,
@@ -114,16 +115,25 @@ router.post("/create", async (req, res) => {
           ? false
           : req.body.preprocessRemoveChars,
       },
-      maps: [...mapResponse.map((map) => map._id), rpMap._id],
-      tags: req.body.tags.map((t) => ({ name: t.name, color: t.color })),
+      maps: [enMapId, rpMap._id, ...Object.keys(tagSets)], // Maps are those that are mapped to a fixed system voacb, user-supplied replacement dictionary, and tags which optionally have tokens/data..
+      tags: tagResponse.map((t) => ({
+        _id: t._id,
+        name: t.type,
+        color: t.color,
+      })), // This is the schema for entity-label tagging.
+      flags: req.body.flags.map((f) => ({
+        name: f,
+      })), // These will be given an _id when the project is populated.
     });
+
+    console.log(project);
 
     if (specialTokens) {
       // Add special tokens array to project
       project.specialTokens = specialTokens;
     }
 
-    project.save();
+    // project.save();
 
     logger.info("[CREATE PROJECT] base project created");
 
@@ -131,7 +141,8 @@ router.post("/create", async (req, res) => {
 
     let textObjs;
     let texts;
-    let allTokens;
+    let allAnnotations = [];
+    let candidateTokens = []; // Candidate tokens are those that are out of English vocab and do not have replacements.
 
     if (req.body.corpusType === "parallel") {
       // User uploads source and target texts; for MT sequence data tokens have no history (original value)
@@ -154,38 +165,19 @@ router.post("/create", async (req, res) => {
         };
       });
 
-      // console.log("textObjs", textObjs);
       texts = await Text.insertMany(
         textObjs.map((obj) => ({ ...obj, projectId: project._id }))
       );
-
-      // console.log("texts", texts);
-
-      allTokens = texts.flatMap((text) => {
-        return createAnnotatedTokens(
-          project._id,
-          text._id,
-          text.original.split(" "),
-          mapSets,
-          rpObj,
-          req.body.preannotationDigitsIV
-        );
-      });
-
-      // console.log("allTokens", allTokens);
     } else {
       // Process texts they are an Object {id:text}. For users who did not select texts with ids, the id is a placeholder.
       const normalisedTexts = Object.assign(
         {},
         ...Object.keys(req.body.corpus).map((textId) => {
           let text = req.body.corpus[textId];
-          text = projectUtils.removeTabs(text);
-          text = projectUtils.removeCasing(req.body.preprocessLowerCase, text);
-          text = projectUtils.removeSpecialChars(
-            req.body.preprocessRemoveCharSet,
-            text
-          );
-          text = projectUtils.removeWhiteSpace(text);
+          text = removeTabs(text);
+          text = removeCasing(req.body.preprocessLowerCase, text);
+          text = removeSpecialChars(req.body.preprocessRemoveCharSet, text);
+          text = removeWhiteSpace(text);
           return { [textId]: text };
         })
       );
@@ -193,43 +185,106 @@ router.post("/create", async (req, res) => {
       // console.log("normalisedTexts", normalisedTexts);
 
       // Duplication removal
-      const filteredTexts = projectUtils.removeDuplicates(
+      const filteredTexts = removeDuplicates(
         req.body.preprocessRemoveDuplicates,
         normalisedTexts
       );
 
-      // Create base texts
-      textObjs = filteredTexts.map((obj) => {
+      function checkIsDigit({ annotateDigits, token }) {
+        return annotateDigits && /^\d+$/g.test(token);
+      }
+
+      // Create base texts, get list of tokens in project, and their associated annotations.
+
+      textObjs = filteredTexts.map((obj, textIndex) => {
+        // Create tokens for the current text
+        const tokens = obj.text.split(" ").map((value, index) => {
+          // Check whether token is in English vocabulary
+          const tokenIV = enMap.has(value)
+            ? true
+            : checkIsDigit({
+                annotateDigits: req.body.preannotationDigitsIV,
+                token: value,
+              });
+
+          if (!tokenIV) {
+            candidateTokens.push(value);
+          }
+
+          // TODO: update req.body to other object.
+          const tokenHasReplacement =
+            req.body.replacementDictionary[value] || false;
+          if (tokenHasReplacement) {
+            candidateTokens.push(value);
+            allAnnotations.push({
+              type: "replacement",
+              userId: userId,
+              value: req.body.replacementDictionary[value],
+              tokenIndex: index,
+              textIndex: textIndex,
+            });
+          }
+
+          // TODO: Do something with tag dictionaries here to create tags...
+          for (const tag of Object.keys(tagSets)) {
+            // Iterate through tags to see whether any tokens match their gazetteers
+
+            const hasTagMatch = tagSets[tag].has(value) || false;
+
+            if (hasTagMatch) {
+              try {
+                allAnnotations.push({
+                  type: "tag",
+                  userId: userId,
+                  value: new mongoose.Types.ObjectId(tag),
+                  tokenIndex: index,
+                  textIndex: textIndex,
+                });
+              } catch (error) {
+                console.log("error assigning matched tag...");
+              }
+            }
+          }
+
+          return {
+            index,
+            value,
+            en: tokenIV,
+          };
+        });
+
+        // Return the object structure for the current text, including its tokens
         return {
           original: obj.text,
           weight: 0,
           rank: 0,
-          saved: false,
           identifiers: obj.ids,
+          projectId: project._id,
+          tokens, // Use the tokens created above
         };
       });
 
-      texts = await Text.insertMany(
-        textObjs.map((obj) => ({ ...obj, projectId: project._id }))
-      );
+      texts = await Text.insertMany(textObjs);
 
-      allTokens = texts.flatMap((text) => {
-        return createAnnotatedTokens(
-          project._id,
-          text._id,
-          text.original.split(" "),
-          mapSets,
-          rpObj,
-          req.body.preannotationDigitsIV
-        );
-      });
+      // Create annotation objects - need to assign token/text ids...
+      for (const annotation of allAnnotations) {
+        const { type, userId, value, tokenIndex, textIndex } = annotation;
+        console.log(type, userId, value, tokenIndex, textIndex);
+        const text = texts[textIndex];
+        const textId = text._id;
+        const tokenId = text.tokens[tokenIndex]._id;
+
+        await Annotations.create({ type, userId, textId, tokenId, value });
+      }
+
+      // console.log("texts: ", texts);
+
+      logger.info("[CREATE PROJECT] texts added to database");
+      console.log("candidates: ", candidateTokens);
+      console.log("allAnnotations:", allAnnotations);
     }
 
-    const allTokensRes = await Token.insertMany(allTokens);
-
     logger.info("[CREATE PROJECT] text and tokens added to database");
-
-    // console.log("allTokensRes", allTokensRes);
 
     // Add texts and metrics to project
     project.texts = texts.map((text) => text._id);
@@ -238,108 +293,64 @@ router.post("/create", async (req, res) => {
     project.metrics.startTokenCount = textTokens.length;
     project.metrics.startVocabSize = new Set(textTokens).size;
 
-    const candidateTokens = allTokensRes
-      .filter(
-        (token) =>
-          Object.values(token.tags).filter((tagBool) => tagBool).length === 0 &&
-          !token.replacement
-      )
-      .map((token) => token.value);
+    logger.info("[CREATE PROJECT] metrics added to project");
+
     project.metrics.startCandidateVocabSize = candidateTokens.length;
     project.save();
 
     logger.info("[CREATE PROJECT] base metrics added to project");
 
-    // console.log("project with metrics", project);
-
-    // Update texts with tokens
-    // First create a map over tokens
-    const textTokenIds = allTokensRes.reduce((value, object) => {
-      if (value[object.textId]) {
-        value[object.textId].push({
-          index: object.index,
-          token: object._id.toString(),
-        });
-      } else {
-        value[object.textId] = [
-          { index: object.index, token: object._id.toString() },
-        ];
-      }
-      return value;
-    }, {});
-
-    // console.log("textTokenIds", textTokenIds);
-    const textUpdateObjs = texts.flatMap((text) => ({
-      updateOne: {
-        filter: { _id: text._id },
-        update: {
-          tokens: textTokenIds[text._id],
-          // allTokensRes
-          //   .filter((token) => token.textId === text._id)
-          //   .map((token) => ({ index: token.index, token: token._id })),
-        },
-        options: { new: true },
-      },
-    }));
-    await Text.bulkWrite(textUpdateObjs);
-
-    logger.info("[CREATE PROJECT] tokens added to texts");
-
     /**
      * Calculate mean, masked, TF-IDF for each text
      */
-    // Compute average document tf-idf
+    // Compute average document tf-idf1
     // - 1. get set of candidate tokens (derived up-stream)
     // - 2. filter texts for only candidate tokens
     // - 3. compute filtered text average tf-idf score/weight
-    const tfidfs = projectUtils.calculateTFIDF(texts); // Token tf-idfs
+    const tfidfs = calculateTFIDF(texts); // Token tf-idfs
 
     logger.info("[CREATE PROJECT] calculated inverse TF-IDF scores");
+    console.log("tfidfs: ", tfidfs);
 
     const candidateTokensUnique = new Set(candidateTokens);
-    // console.log("candidateTokensUnique", candidateTokensUnique);
-
-    // Fetch texts and populate tokens (they aren't returned from the bulkInsert); TODO: Find better method.
-    texts = await Text.find({ projectId: project._id })
-      .populate({
-        path: "tokens.token",
-        select: { _id: 1, value: 1 },
-      })
-      .lean();
 
     //  Calculate mean, weighted, tf-idfs scores (TODO: Review values)
     texts = texts.map((text) => {
-      const tokenWeights = text.original
-        .split(" ")
-        .filter((token) => candidateTokensUnique.has(token))
-        .map((token) => tfidfs[token]);
+      const tokenWeights = text.tokens
+        .filter((token) => candidateTokensUnique.has(token.value))
+        .map((token) => tfidfs[token.value]);
 
       const textWeight =
         tokenWeights.length > 0 ? tokenWeights.reduce((a, b) => a + b) : -1;
 
-      return {
-        ...text,
-        weight: textWeight,
-      };
+      text.weight = textWeight;
+
+      return text;
     });
 
     // Rank texts by their weight
     texts = texts
       .sort((a, b) => b.weight - a.weight)
-      .map((text, index) => ({ ...text, rank: index }));
+      .map((text, index) => {
+        text.rank = index;
+        return text;
+      });
 
     // Add weight and rank to text objects
-    const weightedTextUpdateObjs = texts.map((text) => ({
-      updateOne: {
-        filter: { _id: text._id },
-        update: { weight: text.weight, rank: text.rank },
-        options: { upsert: true },
-      },
-    }));
+    const weightedTextUpdateObjs = texts.map((text) => {
+      const { weight, rank, _id } = text;
+      delete text.projectId;
+
+      return {
+        updateOne: {
+          filter: { _id },
+          update: { $set: { weight, rank } },
+          options: { upsert: true },
+        },
+      };
+    });
     await Text.bulkWrite(weightedTextUpdateObjs);
-
     logger.info("[CREATE PROJECT] weighted and ranked texts");
-
     res.json({ details: "Project created successfully." });
   } catch (error) {
     logger.error("Failed to create project", { route: "/api/project/create" });
@@ -349,11 +360,11 @@ router.post("/create", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-  // utils.authenicateToken,
   try {
     logger.info("Fetching all projects", { route: "/api/project/" });
-    const userId = tokenGetUserId(req.headers["authorization"]);
-    const projects = await Project.find({ user: userId }, { texts: 0 }).lean();
+    const userId = req.userId;
+    // TODO: update to check if userId in owner or annotators.
+    const projects = await Project.find({ owner: userId }, { texts: 0 }).lean();
 
     res.json(projects);
   } catch (error) {
@@ -364,11 +375,11 @@ router.get("/", async (req, res) => {
 });
 
 router.get("/feed", async (req, res) => {
-  // utils.authenicateToken,
-  // logger.info("Fetching project feed", { route: "/api/project/feed" });
+  logger.info("Fetching project feed", { route: "/api/project/feed" });
 
   try {
-    const userId = tokenGetUserId(req.headers["authorization"]);
+    const userId = req.userId;
+
     if (userId) {
       const projects = await Project.find({ user: userId }).lean();
 
@@ -434,19 +445,19 @@ router.get("/feed", async (req, res) => {
   }
 });
 
-router.patch("/", async (req, res) => {
-  // utils.authenicateToken,
+router.patch("/", projectManagementCheck, async (req, res) => {
+  logger.info("Updating single project", { route: "/api/project/" });
   try {
-    logger.info("Updating single project", { route: "/api/project/" });
-    const userId = tokenGetUserId(req.headers["authorization"]);
+    const userId = req.userId;
+    const { name, description, projectId } = req.body;
 
     // Create an object for the fields to update
     const updateFields = {};
-    if (req.body.name) updateFields.name = req.body.name;
-    if (req.body.description) updateFields.description = req.body.description;
+    if (name) updateFields.name = name;
+    if (description) updateFields.description = description;
 
     const updatedProject = await Project.updateOne(
-      { _id: req.body.projectId, user: userId },
+      { _id: projectId, owner: userId },
       { $set: updateFields }
     );
     res.json(updatedProject);
@@ -456,16 +467,17 @@ router.patch("/", async (req, res) => {
   }
 });
 
-router.get("/:projectId", async (req, res) => {
+router.get("/:projectId", projectAccessCheck, async (req, res) => {
+  logger.info("Fetching single project", {
+    route: `/api/project/${req.params.projectId}`,
+  });
+
   try {
-    logger.info("Fetching single project", {
-      route: `/api/project/${req.params.projectId}`,
-    });
-    const userId = tokenGetUserId(req.headers["authorization"]);
+    const { projectId } = req.params;
+
     const project = await Project.findOne(
       {
-        _id: req.params.projectId,
-        user: userId,
+        _id: projectId,
       },
       { texts: 0 }
     ).lean();
@@ -489,25 +501,30 @@ router.get("/:projectId", async (req, res) => {
   }
 });
 
-router.delete("/:projectId", async (req, res) => {
+/**
+ * TODO: Handle multi-user scenario.
+ */
+router.delete("/:projectId", projectManagementCheck, async (req, res) => {
+  logger.info("Deleting project", { route: "/api/project/" });
   try {
-    logger.info("Deleting project", { route: "/api/project/" });
-    const userId = tokenGetUserId(req.headers["authorization"]);
-
+    const userId = req.userId;
+    const { projectId } = req.params;
     const project = await Project.findOne(
       {
-        _id: req.params.projectId,
-        user: userId,
+        _id: projectId,
+        owner: userId,
       },
-      { maps: 1 }
+      { maps: 1, texts: 1 }
     ).lean();
 
-    console.log(project.maps);
+    await Project.deleteOne({ _id: projectId });
+    await Text.deleteMany({ projectId: projectId });
+    await Annotations.deleteMany({ textId: { $in: project.texts } });
+    await Resource.deleteMany({
+      _id: { $in: project.maps },
+      type: { $ne: "en" },
+    });
 
-    await Project.deleteOne({ _id: req.params.projectId });
-    await Text.deleteMany({ projectId: req.params.projectId });
-    await Token.deleteMany({ projectId: req.params.projectId });
-    await Resource.deleteMany({ _id: project.maps });
     res.json("Successfully deleted project.");
   } catch (error) {
     logger.error(`Failed to delete project - ${error}`, {
@@ -517,12 +534,35 @@ router.delete("/:projectId", async (req, res) => {
   }
 });
 
-router.get("/progress/:projectId", async (req, res) => {
+/**
+ * Gets the progress for a single user.
+ */
+router.get("/progress/:projectId", projectAccessCheck, async (req, res) => {
   try {
-    const totalTexts = await Text.count({ projectId: req.params.projectId });
-    const savedTexts = await Text.count({
-      projectId: req.params.projectId,
-      saved: true,
+    const { projectId } = req.params;
+    const userId = req.userId;
+
+    const project = await Project.findById(projectId, "texts").lean();
+
+    // Ensure project exists
+    if (!project) {
+      console.log(`Project not found with ID: ${projectId}`);
+      return res.status(404).send({ message: "Project not found." });
+    }
+
+    const textIds = project.texts;
+    const totalTexts = textIds.length;
+
+    // Check if there are any texts to calculate progress from
+    if (totalTexts === 0) {
+      return res.json({ progress: { value: 0, title: "0/0" } });
+    }
+
+    const savedTexts = await Annotations.count({
+      userId,
+      textId: { $in: textIds },
+      type: "save",
+      value: true,
     });
 
     const progress = {
@@ -531,14 +571,16 @@ router.get("/progress/:projectId", async (req, res) => {
     };
     res.json({ progress });
   } catch (error) {
-    console.log(`Error: ${error}`);
-    res.json({ details: error });
+    console.error(`Error fetching progress: ${error}`);
+    res.status(500).json({ message: "Internal server error." });
   }
 });
 
-// Get metrics that are used in the sidebar for a single project
-router.get("/metrics/:projectId", async (req, res) => {
-  // utils.authenicateToken,
+/**
+ * TODO: Update and make for single user view.
+ * Get metrics that are used in the sidebar for a single project
+ */
+router.get("/metrics/:projectId", projectAccessCheck, async (req, res) => {
   try {
     const project = await Project.findById({
       _id: req.params.projectId,
@@ -606,51 +648,43 @@ router.get("/metrics/:projectId", async (req, res) => {
   }
 });
 
-router.get("/download/:projectId", async (req, res) => {
-  /**
-   * TODO: Adapt output to accommodate token classification format - see:
-   * LexiClean v1 route https://github.com/nlp-tlp/lexiclean/blob/main/server/routes/project/download.js
-   */
+/**
+ * TODO: Adapt output to accommodate token classification format - see:
+ * LexiClean v1 route https://github.com/nlp-tlp/lexiclean/blob/main/server/routes/project/download.js
+ *
+ * Currently limited to a single users own annotations.
+ */
+router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
+  logger.info("Downloading project results", {
+    route: "/api/project/download/:projectId",
+  });
   try {
-    logger.info("Downloading project results", {
-      route: "/api/project/download/:projectId",
-    });
+    const userId = req.userId;
+    const { projectId } = req.params;
 
     const project = await Project.findById(
       {
-        _id: req.params.projectId,
+        _id: projectId,
       },
-      { _id: 0, user: 0, texts: 0, maps: 0, __v: 0, updatedAt: 0 }
+      { _id: 0, owner: 0, maps: 0, __v: 0, updatedAt: 0 }
     ).lean();
 
-    const texts = await Text.find(
-      { projectId: req.params.projectId },
-      { _id: 0, projectId: 0, weight: 0, rank: 0 }
-    )
-      .populate("tokens.token")
-      .lean();
+    const textIds = project.texts;
+    console.log("textIds: ", textIds);
 
-    // TODO: Reduce all of the tokenization histories
-    // let tokenizationHistories = response
-    //   .filter((text) => text.tokenizationHistory.length > 0)
-    //   .map((text) => {
-    //     const histObj = Object.assign(...text.tokenizationHistory);
-    //     const history = Object.keys(histObj).map((key) => ({
-    //       token: histObj[key].map((tokenInfo) => tokenInfo.info.value).join(""),
-    //       pieces: histObj[key].map((tokenInfo) => tokenInfo.info.value),
-    //     }));
-    //     return {
-    //       _id: text._id,
-    //       history: history,
-    //     };
-    //   });
+    delete project.texts;
+
+    const annotations = await Annotations.find({
+      userId,
+      textId: { $in: textIds },
+    }).lean();
 
     res.json({
-      metadata: { ...project, totalTexts: texts.length },
-      texts: formatOutputTexts(texts),
-      resources: {},
-      tokenizations: [], //tokenizationHistories
-      replacements: getReplacementFrequencies(texts),
+      metadata: { ...project, totalTexts: textIds.length },
+      annotations,
+      // texts: formatOutputTexts(texts),
+      // resources: {},
+      // replacements: getReplacementFrequencies(texts),
     });
   } catch (error) {
     console.log(`Error: ${error}`);
@@ -658,11 +692,12 @@ router.get("/download/:projectId", async (req, res) => {
   }
 });
 
-router.get("/summary/:projectId", async (req, res) => {
-  const userId = tokenGetUserId(req.headers["authorization"]);
+/**
+ * Fetch project summary for client dashboard.
+ */
+router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
   const [project] = await Project.find({
     _id: req.params.projectId,
-    user: userId,
   }).lean();
 
   const savedTexts = await Text.count({
@@ -688,13 +723,6 @@ router.get("/summary/:projectId", async (req, res) => {
     )
     .map((token) => token.value).length;
 
-  const texts = await Text.find(
-    { projectId: req.params.projectId },
-    { _id: 0, projectId: 0, weight: 0, rank: 0 }
-  )
-    .populate("tokens.token")
-    .lean();
-
   res.json({
     details: {
       _id: req.params.projectId,
@@ -705,6 +733,7 @@ router.get("/summary/:projectId", async (req, res) => {
       createdAt: project.createdAt,
       preprocessing: project.preprocessing,
       tags: project.tags,
+      flags: project.flags,
     },
     metrics: [
       { name: "Project Texts", value: project.texts.length },
@@ -732,9 +761,69 @@ router.get("/summary/:projectId", async (req, res) => {
     ],
     lists: {
       mostFrequentWords: {},
-      mostFrequentReplacements: getReplacementFrequencies(texts, 50),
+      mostFrequentReplacements: {}, //getReplacementFrequencies(texts, 50),
     },
   });
 });
 
-module.exports = router;
+/**
+ * Add new flags to project, remove existing flags, update existing flags.
+ * Deletes flag annotations for any removed existing flags that are used.
+ */
+router.patch("/:projectId/flags", projectManagementCheck, async (req, res) => {
+  logger.info("Patching project flags", {
+    route: "/api/project/flags",
+    body: req.body,
+  });
+
+  try {
+    const { projectId } = req.params;
+    const { flags } = req.body;
+
+    // Separate incoming flags into categories: new, updated, and to determine removed
+    const newFlags = flags
+      .filter((flag) => typeof flag === "string")
+      .map((name) => ({ name }));
+    const updatedFlags = flags.filter(
+      (flag) => typeof flag === "object" && flag._id
+    );
+
+    // Retrieve the current project to get existing flags
+    const project = await Project.findById(projectId, { flags: 1 });
+    if (!project) return res.status(404).send("Project not found");
+
+    // Determine which existing flags were not mentioned in the update and hence are to be removed
+    const removedFlagIds = project.flags
+      .filter(
+        (oldFlag) =>
+          !updatedFlags.some(
+            (newFlag) =>
+              newFlag._id && newFlag._id.toString() === oldFlag._id.toString()
+          )
+      )
+      .map((flag) => flag._id);
+
+    // Prepare the flags for database update: combine updated flags with new flags
+    const flagsToUpdate = [...updatedFlags, ...newFlags];
+
+    // Update the project with combined updated and new flags, removing the old ones and return the updated document
+    const updatedProject = await Project.findByIdAndUpdate(
+      projectId,
+      { $set: { flags: flagsToUpdate } },
+      { new: true, fields: { flags: 1 } } // Return the updated document with only flags field
+    );
+
+    if (!updatedProject) return res.status(404).send("Project not found");
+
+    if (removedFlagIds.length > 0) {
+      await Annotations.deleteMany({ value: { $in: removedFlagIds } });
+    }
+
+    res.json(updatedProject.flags);
+  } catch (error) {
+    console.error("Error updating project flags:", error);
+    res.status(500).send("Internal server error");
+  }
+});
+
+export default router;
