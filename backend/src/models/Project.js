@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 const Schema = mongoose.Schema;
 
 const ProjectSchema = mongoose.Schema(
@@ -43,14 +43,26 @@ const ProjectSchema = mongoose.Schema(
         color: { type: String, required: true },
       },
     ],
+    flags: [
+      {
+        name: { type: String, required: true },
+      },
+    ],
     specialTokens: [{ type: String, required: false }], // Used for parellel corpus to treat as IV (without adding to En lexicon)
     metrics: {
       startVocabSize: { type: Number, default: 0 },
       startCandidateVocabSize: { type: Number, default: 0 }, // OOV tokens
       startTokenCount: { type: Number, default: 0 },
     },
+    annotators: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+        required: false,
+      },
+    ],
   },
   { _id: true, timestamps: true }
 );
 
-module.exports = mongoose.model("Project", ProjectSchema);
+export default mongoose.model("Project", ProjectSchema);
