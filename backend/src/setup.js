@@ -1,7 +1,9 @@
-const { MongoClient } = require("mongodb");
-require("dotenv").config({ path: "../.env" });
-const path = require("path");
-const fs = require("fs").promises; // Use fs promises for async/await
+import { MongoClient } from "mongodb";
+import dotenv from "dotenv";
+import path from "path";
+import fs from "fs/promises"; // Direct import of fs/promises for async/await
+
+dotenv.config({ path: "../.env" });
 
 const appRoot = process.env.APP_ROOT || ".";
 const lexiconPath = path.join(appRoot, "data", "en_lexicon.json");
