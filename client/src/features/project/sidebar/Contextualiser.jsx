@@ -1,25 +1,19 @@
 import { useContext, useEffect, useState } from "react";
-import {
-  Typography,
-  Grid,
-  Stack,
-  Chip,
-  Box,
-  Paper,
-  Divider,
-} from "@mui/material";
+import { Typography, Stack, Chip, Box, Paper, Divider } from "@mui/material";
 import { ProjectContext } from "../../../shared/context/ProjectContext";
 import useMiscActions from "../../../shared/hooks/api/misc";
+import { useParams } from "react-router-dom";
 
 const Contextualiser = () => {
   const [state, dispatch] = useContext(ProjectContext);
   const [data, setData] = useState();
   const { getTokenContext } = useMiscActions();
+  const { projectId } = useParams();
 
   useEffect(() => {
     const fetchData = async () => {
       const data = await getTokenContext({
-        projectId: state.projectId,
+        projectId,
         tokenValue: state.selectedToken.value,
       });
 
@@ -43,16 +37,19 @@ const Contextualiser = () => {
           Contextualiser
         </Typography>
         <Divider />
-        <Box p={1}>
+        <Box p="0.5rem 0rem">
+          <Typography variant="caption" fontWeight="bold">
+            Details
+          </Typography>
           {state.selectedToken ? (
-            <Stack>
-              <Typography fontSize={12}>
-                Current Value: {state.selectedToken.currentValue}
+            <Stack direction="column" spacing={1}>
+              <Typography variant="caption">
+                Current value: {state.selectedToken.currentValue}
               </Typography>
               {state.selectedToken.currentValue !==
                 state.selectedToken.value && (
-                <Typography fontSize={12}>
-                  Original Value: {state.selectedToken.value}
+                <Typography variant="caption">
+                  Original value: {state.selectedToken.value}
                 </Typography>
               )}
             </Stack>
@@ -61,38 +58,46 @@ const Contextualiser = () => {
           )}
           {state.selectedToken && data && (
             <>
-              <Typography variant="caption">
-                Replacements made on similar tokens:
+              <Typography variant="caption" fontWeight="bold">
+                Actions performed on similar tokens
               </Typography>
-              <Stack
-                direction="row"
-                spacing={1}
-                pt={1}
-                sx={{
-                  flexWrap: "wrap",
-                  gap: 0.5,
-                  justifyContent: "flex-start",
-                }}
-              >
-                {Object.keys(data.replacements).length === 0 ? (
-                  <Chip label={"Nothing found"} size="small" />
+              <Stack direction="column" spacing={1} pt={1}>
+                {data.length === 0 ? (
+                  <Typography variant="caption">Nothing found</Typography>
                 ) : (
-                  Object.keys(data.replacements).map((value) => (
-                    <Chip
-                      color="primary"
-                      key={`replacement-${value}-${data.replacements[value]}`}
-                      label={`${value}: ${data.replacements[value]}`}
-                      size="small"
-                    />
+                  data.map((d) => (
+                    <>
+                      <Typography
+                        variant="caption"
+                        sx={{ textTransform: "capitalize" }}
+                      >
+                        {d.type}s {d.isSuggestion && "(suggested)"}
+                      </Typography>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{
+                          flexWrap: "wrap",
+                          gap: 0.5,
+                          justifyContent: "flex-start",
+                        }}
+                      >
+                        {Object.entries(d.matches).map(([name, count]) => (
+                          <Chip
+                            color="primary"
+                            label={`${
+                              d.type === "tag"
+                                ? state.project.schemaMap[name].name
+                                : name
+                            }: ${count}`}
+                            size="small"
+                          />
+                        ))}
+                      </Stack>
+                    </>
                   ))
                 )}
               </Stack>
-              {/* <Typography variant="caption">Similar Terms</Typography>
-            <Stack direction="row" spacing={2} p={1}>
-              {data.similar.map((item) => (
-                <Chip key={`similar-${item}`} label={item} size="small" />
-              ))}
-            </Stack> */}
             </>
           )}
         </Box>
