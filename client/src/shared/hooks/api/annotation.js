@@ -2,10 +2,12 @@ import useApi from "../useApi";
 import { useSnackbar } from "../../context/SnackbarContext";
 import { useContext } from "react";
 import { ProjectContext } from "../../context/ProjectContext";
+import { useParams } from "react-router-dom";
 
 const useAnnotationActions = () => {
   const callApi = useApi();
   const [state, dispatch] = useContext(ProjectContext);
+  const { projectId } = useParams();
 
   const { dispatch: snackbarDispatch } = useSnackbar();
 
@@ -22,12 +24,14 @@ const useAnnotationActions = () => {
   }) => {
     try {
       const payload = {
+        projectId,
         tokenId,
         textId,
         replacement,
         applyAll,
         suggestion,
         textIds,
+        originalValue,
       };
 
       const data = await callApi("/api/token/add", {
@@ -45,9 +49,17 @@ const useAnnotationActions = () => {
             originalValue: originalValue,
           },
         });
+
+        const successMessage =
+          data.matches === 0
+            ? "No changes made."
+            : applyAll
+            ? `Updated '${originalValue}' to '${currentValue}' for ${data.matches} instances successfully.`
+            : `Updated '${originalValue}' to '${currentValue}' for ${data.matches} for the current instance successfully.`;
+
         snackbarDispatch({
           type: "SHOW",
-          message: `Updated '${originalValue}' to '${currentValue}' ${data.matches} times`,
+          message: successMessage,
           severity: "success",
         });
       }
@@ -70,7 +82,14 @@ const useAnnotationActions = () => {
     currentValue,
   }) => {
     try {
-      const payload = { textId, tokenId, applyAll, textIds };
+      const payload = {
+        textId,
+        tokenId,
+        applyAll,
+        textIds,
+        originalValue,
+        projectId,
+      };
 
       const data = await callApi("/api/token/delete", {
         method: "PATCH",
@@ -88,11 +107,14 @@ const useAnnotationActions = () => {
             currentValue: currentValue,
           },
         });
+
+        const successMessage = applyAll
+          ? `Token '${originalValue}' deleted for ${data.matches} instances successfully.`
+          : `Token '${originalValue}' deleted for the current instance successfully.`;
+
         snackbarDispatch({
           type: "SHOW",
-          message: `Deleted '${originalValue}' (and similar ${
-            applyAll ? "in all texts" : "occurrence"
-          }) successfully.`,
+          message: successMessage,
           severity: "success",
         });
       }
@@ -116,10 +138,12 @@ const useAnnotationActions = () => {
   }) => {
     try {
       const payload = {
+        projectId,
         tokenId,
         textId,
         applyAll,
         textIds,
+        originalValue,
       };
       const data = await callApi("/api/token/accept", {
         method: "PATCH",
@@ -137,8 +161,9 @@ const useAnnotationActions = () => {
             currentValue: currentValue,
           },
         });
+
         const successMessage = applyAll
-          ? `Token '${originalValue}' accepted for all instances successfully.`
+          ? `Token '${originalValue}' accepted for ${data.matches} instances successfully.`
           : `Token '${originalValue}' accepted for the current instance successfully.`;
 
         snackbarDispatch({
@@ -150,7 +175,7 @@ const useAnnotationActions = () => {
     } catch (error) {
       snackbarDispatch({
         type: "SHOW",
-        message: `Error occurred accepting token: ${error}`,
+        message: `Error occurred accepting token: ${error.message}`,
         severity: "error",
       });
     }
@@ -249,50 +274,70 @@ const useAnnotationActions = () => {
     } catch (error) {
       snackbarDispatch({
         type: "SHOW",
-        message: `Failed to tokenize phrase.`,
+        message: `Failed to tokenize phrase: ${error}`,
         severity: "error",
       });
     }
   };
 
-  const applyLabelAction = async ({ tokenId, entityLabelId }) => {
+  const applyLabelAction = async ({
+    textId,
+    tokenId,
+    entityLabelId,
+    applyAll,
+  }) => {
     /**
      * Each token has a `tags` field which contains details of applied token-level entity labels (tags).
      */
 
-    console.log("tokenId", tokenId);
-    console.log("entityLabel", entityLabelId);
-
     try {
-      const data = await callApi("/api/token/meta/add/single", {
+      const data = await callApi("/api/token/label/add", {
         method: "PATCH",
         data: {
+          projectId,
+          textId,
           tokenId,
           entityLabelId,
+          applyAll,
         },
       });
 
       if (data) {
-        console.log("data: ", data);
         dispatch({
           type: "APPLY_TAG",
           payload: {
-            applyAll: false,
+            ...data,
+            applyAll,
             tokenId,
-            tags: data,
+            entityLabelId,
             textId: state.selectedTextId,
           },
         });
       }
-      // snackbar
+      const labelDetails = state.project.schemaMap[entityLabelId];
+
+      const successMessage = applyAll
+        ? `Applied '${labelDetails.name}' to ${data.matches} instances successfully.`
+        : `Applied '${labelDetails.name}' to the current instance successfully.`;
+
+      snackbarDispatch({
+        type: "SHOW",
+        message: successMessage,
+        severity: "success",
+      });
     } catch (error) {
-      // snackbar
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Error occurred applying label: ${error}`,
+        severity: "error",
+      });
     }
   };
 
   // const acceptLabelAction = async () => {
 
   // }
+
   const deleteLabelAction = async ({
     textId,
     tokenId,
@@ -300,24 +345,32 @@ const useAnnotationActions = () => {
     applyAll,
   }) => {
     try {
-      const data = await callApi(`/api/token/meta/remove/one/${tokenId}`, {
+      const data = await callApi(`/api/token/label/delete`, {
         method: "PATCH",
-        data: { entityLabelId },
+        data: { textId, tokenId, entityLabelId, applyAll, projectId },
       });
 
       if (data) {
         dispatch({
           type: "DELETE_TAG",
           payload: {
+            ...data,
             applyAll,
             tokenId,
-            tags: data,
-            textId: textId,
+            entityLabelId,
+            textId,
           },
         });
+
+        const labelDetails = state.project.schemaMap[entityLabelId];
+
+        const successMessage = applyAll
+          ? `Deleted '${labelDetails.name}' on ${data.matches} instances successfully.`
+          : `Deleted '${labelDetails.name}' on the current instance successfully.`;
+
         snackbarDispatch({
           type: "SHOW",
-          message: `Successfully deleted label`,
+          message: successMessage,
           severity: "success",
         });
       } else {
