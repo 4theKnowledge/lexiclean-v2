@@ -1,5 +1,24 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 const Schema = mongoose.Schema;
+
+// Define the Token subdocument schema
+const TokenSchema = new Schema(
+  {
+    index: {
+      type: Number,
+      required: true,
+    },
+    value: {
+      type: String,
+      required: true,
+    },
+    en: {
+      type: Boolean,
+      required: true,
+    },
+  },
+  { _id: true }
+); // Enable _id for each token, it's enabled by default but included here for clarity
 
 const TextSchema = new mongoose.Schema(
   {
@@ -17,36 +36,36 @@ const TextSchema = new mongoose.Schema(
       type: String,
       required: false,
     },
-    tokens: [
-      {
-        _id: 0,
-        index: {
-          type: Number,
-          required: true,
-        },
-        token: {
-          type: Schema.Types.ObjectId,
-          ref: "Token",
-          required: true,
-        },
-      },
-    ],
+    tokens: [TokenSchema],
     weight: {
       type: Number,
       required: false,
     },
-    saved: {
-      type: Boolean,
-      required: false,
-      default: false,
-    },
-    tokenizationHistory: [{ type: Schema.Types.Mixed, required: false }],
     rank: {
       type: Number,
+      required: true,
     },
+    // saved: [
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "User",
+    //     required: false,
+    //   },
+    // ],
+    // tokenizationHistory: [{ type: Schema.Types.Mixed, required: false }],
     identifiers: [{ type: String }],
+    // flags: [
+    //   {
+    //     user: {
+    //       type: Schema.Types.ObjectId,
+    //       ref: "User",
+    //       required: true,
+    //     },
+    //     value: { type: "String", required: true },
+    //   },
+    // ],
   },
   { _id: true, timestamps: true }
 );
 
-module.exports = mongoose.model("Text", TextSchema);
+export default mongoose.model("Text", TextSchema);
