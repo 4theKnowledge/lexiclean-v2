@@ -28,7 +28,6 @@ function App() {
           <AppProvider>
             <ProjectProvider>
               <CustomSnackbar />
-
               <BrowserRouter>
                 <ErrorBoundaryProvider>
                   <Routes>
