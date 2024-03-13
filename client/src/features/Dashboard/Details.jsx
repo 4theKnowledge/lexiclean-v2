@@ -16,6 +16,7 @@ const Details = ({ loading, data, handleUpdate }) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isUnchanged, setIsUnchanged] = useState(true);
+
   useEffect(() => {
     if (!loading) {
       setName(data.details.name);
