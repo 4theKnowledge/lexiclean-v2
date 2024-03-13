@@ -4,6 +4,7 @@ import {
   IconButton,
   List,
   ListItem,
+  ListItemButton,
   ListItemIcon,
   ListItemText,
   Stack,
@@ -121,9 +122,10 @@ const PrimarySidebar = ({ drawerOpen, handleDrawerToggle }) => {
         <Box>
           <Box component="nav" p="1rem 1rem 1rem 0rem">
             <List>
-              <ListItem
-                component={Link}
-                to="/docs"
+              <ListItemButton
+                disabled
+                // component={Link}
+                // to="/docs"
                 sx={{
                   color: "text.secondary",
                 }}
@@ -132,10 +134,11 @@ const PrimarySidebar = ({ drawerOpen, handleDrawerToggle }) => {
                   <ArticleIcon />
                 </ListItemIcon>
                 <ListItemText primary={"Documentation"} />
-              </ListItem>
-              <ListItem
-                component={Link}
-                to="/settings"
+              </ListItemButton>
+              <ListItemButton
+                disabled
+                // component={Link}
+                // to="/settings"
                 sx={{
                   color: "text.secondary",
                 }}
@@ -144,7 +147,7 @@ const PrimarySidebar = ({ drawerOpen, handleDrawerToggle }) => {
                   <SettingsIcon />
                 </ListItemIcon>
                 <ListItemText primary={"Settings"} />
-              </ListItem>
+              </ListItemButton>
             </List>
           </Box>
           <Divider />
