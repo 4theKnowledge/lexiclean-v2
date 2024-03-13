@@ -189,6 +189,21 @@ const reducer = (state, action) => {
       return { ...updatedState, texts: updatedTexts };
     }
 
+    case "ADD_FLAG": {
+      const { textId, flagId } = action.payload;
+      const updatedState = { ...state };
+      updatedState.texts[textId].flags.push(flagId);
+      return updatedState;
+    }
+    case "DELETE_FLAG": {
+      const { textId, flagId } = action.payload;
+      const updatedState = { ...state };
+      updatedState.texts[textId].flags = updatedState.texts[
+        textId
+      ].flags.filter((f) => f !== flagId);
+      return updatedState;
+    }
+
     case "SET_SHOW_TOAST": {
       return { ...state, showToast: action.payload };
     }
