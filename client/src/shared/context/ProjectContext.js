@@ -1,21 +1,5 @@
 import * as React from "react";
-import { updateTexts } from "../utils/project-context";
-
-const updateTagsById = (data, targetId, newTags) => {
-  // Create a new object to avoid mutating the original data
-  const updatedData = { ...data };
-
-  // Iterate over each key in the object
-  Object.keys(updatedData).forEach((key) => {
-    // Check if the current item's _id matches the targetId
-    if (updatedData[key]._id === targetId) {
-      // Update the tags object for this item
-      updatedData[key].tags = newTags;
-    }
-  });
-
-  return updatedData;
-};
+import { updateTextTokenTags, updateTexts } from "../utils/project-context";
 
 const initialState = {
   filters: {
@@ -181,35 +165,28 @@ const reducer = (state, action) => {
     }
 
     case "APPLY_TAG": {
-      const { applyAll, tokenId, tags, textId } = action.payload;
+      const { tokenId, entityLabelId, textTokenIds } = action.payload;
       const updatedState = { ...state };
-
-      if (applyAll) {
-      } else {
-        const updatedTokens = updateTagsById(
-          updatedState.texts[textId].tokens,
-          tokenId,
-          tags
-        );
-        updatedState.texts[textId].tokens = updatedTokens;
-      }
-
-      return updatedState;
+      const updatedTexts = updateTextTokenTags({
+        action: "apply",
+        texts: updatedState.texts,
+        textTokenIds,
+        focusTokenId: tokenId,
+        entityLabelId,
+      });
+      return { ...updatedState, texts: updatedTexts };
     }
     case "DELETE_TAG": {
-      const { applyAll, tokenId, tags, textId } = action.payload;
+      const { tokenId, entityLabelId, textTokenIds } = action.payload;
       const updatedState = { ...state };
-      if (applyAll) {
-      } else {
-        const updatedTokens = updateTagsById(
-          updatedState.texts[textId].tokens,
-          tokenId,
-          tags
-        );
-        updatedState.texts[textId].tokens = updatedTokens;
-      }
-
-      return updatedState;
+      const updatedTexts = updateTextTokenTags({
+        action: "delete",
+        texts: updatedState.texts,
+        textTokenIds,
+        focusTokenId: tokenId,
+        entityLabelId,
+      });
+      return { ...updatedState, texts: updatedTexts };
     }
 
     case "SET_SHOW_TOAST": {
