@@ -1,37 +1,13 @@
 import { Box, Button, Stack, TextField, Typography } from "@mui/material";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
 import StyledCard from "./StyledCard";
 
 const Settings = ({ loading, data, downloadProject, deleteProject }) => {
-  const { projectId } = useParams();
   const [deleteName, setDeleteName] = useState("");
 
   return (
     <StyledCard title={"Settings"}>
       <Box display="flex" flexDirection="column">
-        <Box
-          display="flex"
-          justifyContent="space-between"
-          mb={4}
-          alignItems="center"
-        >
-          <Box>
-            <Typography fontWeight="bold" color="text.secondary">
-              Annotate Project
-            </Typography>
-            <Typography variant="caption">
-              Click to navigate to your project to commence annotation.
-            </Typography>
-          </Box>
-          <Button
-            component={Link}
-            to={`/project/${projectId}`}
-            variant="contained"
-          >
-            Annotate
-          </Button>
-        </Box>
         <Box
           display="flex"
           justifyContent="space-between"
