@@ -36,3 +36,5 @@ yarn-error.log*
 */__pycache__/*
 backend/logger/logs.json
 backend/src/logger/logs.json
+
+./data/*
