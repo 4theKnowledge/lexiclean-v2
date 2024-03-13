@@ -1,18 +1,14 @@
-import { Box, CircularProgress, Grid } from "@mui/material";
+import { Alert, Box, CircularProgress, Grid } from "@mui/material";
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import {
-  downloadProjectData,
-  deleteProjectById,
-  fetchProjectSummaryById,
-} from "../../shared/api/dashboard";
 import { downloadFile } from "../../shared/utils/dashboard";
 import { useSnackbar } from "../../shared/context/SnackbarContext";
 import Schema from "./Schema";
-import axiosInstance from "../../shared/api/axiosInstance";
 import Settings from "./Settings";
 import Overview from "./Overview";
 import Details from "./Details";
+import Annotators from "./Annotators";
+import useDashboardActions from "../../shared/hooks/api/dashboard";
 
 const Dashboard = () => {
   const { projectId } = useParams();
@@ -20,8 +16,14 @@ const Dashboard = () => {
   const [data, setData] = useState();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [deleteName, setDeleteName] = useState("");
   const { dispatch: snackbarDispatch } = useSnackbar();
+  const {
+    fetchProjectSummaryById,
+    downloadProjectData,
+    deleteProjectById,
+    updateProjectSchema,
+    updateProjectDetail,
+  } = useDashboardActions();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -30,110 +32,65 @@ const Dashboard = () => {
         setData(projectData);
       } catch (error) {
         setError(error);
-        snackbarDispatch({
-          type: "SHOW",
-          message: `Unable to fetch project dashboard information `,
-          severity: "error",
-        });
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [projectId]); // Dependency array to refetch when projectId changes
+  }, [projectId]);
 
   const downloadProject = async () => {
-    try {
-      const response = await downloadProjectData(projectId);
-      if (response.status === 200) {
-        downloadFile({ data: response.data, fileName: `${data.name}.json` });
-      } else {
-        throw Error;
-      }
-    } catch (error) {
-      snackbarDispatch({
-        type: "SHOW",
-        message: `Failed to download project: ${error}`,
-        severity: "error",
-      });
-    }
+    const data = await downloadProjectData(projectId);
+    downloadFile({ data: data, name: `${data.metadata.name}-annotations` });
   };
 
   const deleteProject = async () => {
-    try {
-      const response = await deleteProjectById(projectId);
-      if (response.status === 200) {
-        navigate("/projects");
-      }
-    } catch (error) {
-      console.log(`Error: ${error}`);
-    }
+    await deleteProjectById(projectId);
+    navigate("/projects");
   };
 
   const handleUpdateSchema = async (key, newValue) => {
-    // Update value associated with project (name, description) including schema.
+    const data = await updateProjectSchema({
+      projectId: projectId,
+      newTags: newValue,
+    });
 
-    try {
-      const response = await axiosInstance.post(`/api/schema/${projectId}`, {
-        tags: newValue,
+    if (data) {
+      setData((prevState) => {
+        const updatedData = { ...prevState };
+        updatedData.details.tags = newValue;
+        return updatedData;
       });
-
-      if (response.status === 200) {
-        setData((prevState) => {
-          const updatedData = { ...prevState };
-          updatedData.details.tags = newValue;
-          return updatedData;
-        });
-        snackbarDispatch({
-          type: "SHOW",
-          message: `Succesfully modified project schema`,
-          severity: "success",
-        });
-      } else {
-        throw new Error("Failed to modify project schema");
-      }
-    } catch (error) {
       snackbarDispatch({
         type: "SHOW",
-        message: error,
-        severity: "error",
+        message: `Succesfully modified project schema`,
+        severity: "success",
       });
     }
   };
 
   const handleUpdateDetails = async (name, description) => {
-    try {
-      const response = await axiosInstance.patch("/api/project", {
-        projectId,
-        name,
-        description,
-      });
-
-      if (response.status === 200) {
-        setData((prevState) => ({
-          ...prevState,
-          details: {
-            ...prevState.details,
-            name: name,
-            description: description,
-          },
-        }));
-        snackbarDispatch({
-          type: "SHOW",
-          message: "Succesfully updated project details",
-          severity: "success",
-        });
-      } else {
-        throw new Error("Failed to update project details");
-      }
-    } catch (error) {
+    const data = await updateProjectDetail({ projectId, name, description });
+    if (data) {
+      setData((prevState) => ({
+        ...prevState,
+        details: {
+          ...prevState.details,
+          name: name,
+          description: description,
+        },
+      }));
       snackbarDispatch({
         type: "SHOW",
-        message: error,
-        severity: "error",
+        message: "Succesfully updated project details",
+        severity: "success",
       });
     }
+  };
+
+  const handleUpdateAnnotators = async () => {
+    alert("handleUpdateAnnotators - not implemented yet.");
   };
 
   if (loading)
@@ -142,7 +99,12 @@ const Dashboard = () => {
         <CircularProgress />
       </Box>
     );
-  if (error) return <div>Error: {error.message}</div>;
+  if (error)
+    return (
+      <Box sx={{ height: "100vh", margin: "auto" }} pt={4}>
+        <Alert severity="error">Error: {error.message}</Alert>
+      </Box>
+    );
 
   return (
     <Grid container spacing={2} mt={8}>
@@ -156,6 +118,13 @@ const Dashboard = () => {
           handleUpdate={handleUpdateDetails}
         />
       </Grid>
+      {/* <Grid item xs={12}>
+        <Annotators
+          loading={loading}
+          data={data}
+          handleUpdate={handleUpdateAnnotators}
+        />
+      </Grid> */}
       <Grid item xs={12}>
         <Schema
           loading={loading}
