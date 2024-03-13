@@ -1,38 +1,36 @@
-function extractTags(token, tagSets) {
+const extractTags = (token, tagSets) => {
   return Object.keys(tagSets)
     .filter((key) => key !== "rp")
     .reduce((tags, key) => ({ ...tags, [key]: tagSets[key].has(token) }), {});
-}
-
-module.exports = {
-  createAnnotatedTokens: function (
-    projectId,
-    textId,
-    tokens,
-    tagSets,
-    replacements,
-    annotateDigits = false
-  ) {
-    const hasReplacements = Object.values(tagSets).includes("rp");
-
-    return tokens.map((token, index) => {
-      const tokenTags = extractTags(token, tagSets);
-      const isDigit = annotateDigits && /^\d+$/g.test(token);
-
-      return {
-        value: token,
-        index,
-        tags: isDigit ? { ...tokenTags, en: true } : tokenTags,
-        replacement:
-          hasReplacements && tagSets.rp.has(token) ? replacements[token] : null,
-        suggestion: null,
-        active: true,
-        textId,
-        projectId,
-      };
-    });
-  },
 };
+
+export const createAnnotatedTokens = (
+  projectId,
+  textId,
+  tokens,
+  tagSets,
+  replacements,
+  annotateDigits = false
+) => {
+  const hasReplacements = "rp" in tagSets;
+
+  return tokens.map((token, index) => {
+    const tokenTags = extractTags(token, tagSets);
+    const isDigit = annotateDigits && /^\d+$/g.test(token);
+
+    return {
+      value: token,
+      index,
+      // tags: isDigit ? { ...tokenTags, en: true } : tokenTags,
+      // replacement: hasReplacements && tagSets.rp.has(token) ? replacements[token] : null,
+      // suggestion: null, // Assuming you'll add logic here later
+      // active: true, // Assuming this is always true, adjust as needed
+      textId,
+      projectId,
+    };
+  });
+};
+
 //   createAnnotatedTokens: function (
 //     projectId,
 //     textId,
