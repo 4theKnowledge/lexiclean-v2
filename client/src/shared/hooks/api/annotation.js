@@ -385,6 +385,62 @@ const useAnnotationActions = () => {
     }
   };
 
+  const addFlag = async ({ textId, flagId }) => {
+    try {
+      const data = await callApi("/api/text/flag", {
+        method: "PATCH",
+        data: { textId, flagId, projectId },
+      });
+
+      if (data) {
+        // dispatch
+        dispatch({ type: "ADD_FLAG", payload: { textId, flagId } });
+        // snackbar
+        snackbarDispatch({
+          type: "SHOW",
+          message: "Added flag to text.",
+          severity: "success",
+        });
+      } else {
+        throw new Error("Failed to add flag.");
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: error,
+        severity: "error",
+      });
+    }
+  };
+
+  const deleteFlag = async ({ textId, flagId }) => {
+    try {
+      const data = await callApi("/api/text/flag", {
+        method: "PATCH",
+        data: { textId, flagId, projectId },
+      });
+
+      if (data) {
+        // dispatch
+        dispatch({ type: "DELETE_FLAG", payload: { textId, flagId } });
+        // snackbar
+        snackbarDispatch({
+          type: "SHOW",
+          message: "Deleted flag from text.",
+          severity: "success",
+        });
+      } else {
+        throw new Error("Failed to delete flag.");
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: error,
+        severity: "error",
+      });
+    }
+  };
+
   return {
     applyTokenTransformAction,
     deleteTokenTransformAction,
@@ -394,6 +450,8 @@ const useAnnotationActions = () => {
     tokenizeTokensAction,
     applyLabelAction,
     deleteLabelAction,
+    addFlag,
+    deleteFlag,
   };
 };
 
