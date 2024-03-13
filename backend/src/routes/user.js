@@ -1,8 +1,9 @@
-const express = require("express");
+import express from "express";
+import { jwtDecode } from "jwt-decode";
+import logger from "../logger/index.js";
+import User from "../models/User.js";
+
 const router = express.Router();
-const logger = require("../logger");
-const User = require("../models/User");
-const { jwtDecode } = require("jwt-decode");
 
 router.get("/", async (req, res) => {
   const user = jwtDecode(req.headers.authorization.replace("Bearer ", ""));
@@ -82,4 +83,4 @@ router.patch("/:userId", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
