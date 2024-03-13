@@ -103,7 +103,7 @@ const useProjectActions = () => {
     try {
       const data = await callApi("/api/text/save", {
         method: "PATCH",
-        data: { textIds, saved: isSaved },
+        data: { textIds, saved: isSaved, projectId },
       });
 
       if (data) {
