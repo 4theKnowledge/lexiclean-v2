@@ -15,7 +15,6 @@ import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { ProjectContext } from "../../shared/context/ProjectContext";
 import { useNavigate } from "react-router-dom";
 import FilterListIcon from "@mui/icons-material/FilterList";
-import { useSnackbar } from "../../shared/context/SnackbarContext";
 import { useTheme } from "@mui/material/styles";
 import useAnnotationActions from "../../shared/hooks/api/annotation";
 
@@ -150,6 +149,7 @@ const EditPopover = (props) => {
   const showOperations = editing || hasReplacement || hasSuggestion;
   const showSplitTokenOperation = /\s/.test(currentValue);
   const showReplacementOperations = editing || hasReplacement;
+  const disableReplacementOperations = !editing || hasReplacement;
   const showSuggestionOperations = hasSuggestion && !showReplacementOperations;
   const showDeleteOperations =
     originalValue !== currentValue ||
@@ -188,6 +188,7 @@ const EditPopover = (props) => {
       title: `Apply this correction to the current token only`,
       action: () => handleApplyAction(false),
       show: showReplacementOperations,
+      disable: disableReplacementOperations,
     },
     {
       name: "delete-one",
@@ -250,6 +251,7 @@ const EditPopover = (props) => {
                 key={`entity-tooltip-btn-${item.name}`}
                 size="small"
                 onClick={item.action}
+                disabled={item.disable}
               >
                 {item.icon}
               </IconButton>
