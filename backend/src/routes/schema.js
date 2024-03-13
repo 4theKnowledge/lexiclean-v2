@@ -1,7 +1,8 @@
-const express = require("express");
+import express from "express";
+import logger from "../logger/index.js";
+import Project from "../models/Project.js";
+
 const router = express.Router();
-const logger = require("../logger");
-const Project = require("../models/Project");
 
 router.post("/:projectId", async (req, res) => {
   const { tags } = req.body;
@@ -52,4 +53,4 @@ router.post("/:projectId", async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
