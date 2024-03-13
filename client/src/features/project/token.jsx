@@ -30,7 +30,7 @@ export const SpanComponent = styled(Typography)((props) => ({
 const Token = ({ textId, token, tokenIndex }) => {
   const hasReplacement = token.replacement;
   const hasSuggestion = token.suggestion;
-  const isOutOfVocab = !token.tags.en;
+  const isOutOfVocab = !token.en;
   const [editing, setEditing] = useState(false);
   const tokenRef = useRef(null);
   const [state, dispatch] = useContext(ProjectContext);
@@ -160,9 +160,9 @@ const Token = ({ textId, token, tokenIndex }) => {
         />
       )}
       <Stack direction="column" mt={0.25}>
-        {Object.entries(token.tags)
-          .filter(([labelId, active]) => labelId !== "en" && active)
-          .map(([labelId]) => (
+        {token.tags
+          .filter((labelId) => labelId !== "en") //  && active
+          .map((labelId) => (
             <SpanEntityAnnotation
               key={`${token._id}-${labelId}`}
               tokenId={token._id}
