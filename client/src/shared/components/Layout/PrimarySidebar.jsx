@@ -123,9 +123,11 @@ const PrimarySidebar = ({ drawerOpen, handleDrawerToggle }) => {
           <Box component="nav" p="1rem 1rem 1rem 0rem">
             <List>
               <ListItemButton
-                disabled
-                // component={Link}
-                // to="/docs"
+                component={Link}
+                disabled={!process.env.REACT_APP_DOCS_URL}
+                to={process.env.REACT_APP_DOCS_URL}
+                target="_blank"
+                rel="noopener noreferrer"
                 sx={{
                   color: "text.secondary",
                 }}
