@@ -13,30 +13,35 @@ import ModeEditIcon from "@mui/icons-material/ModeEdit";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import { truncateText } from "../../shared/utils/general";
 import ArticleIcon from "@mui/icons-material/Article";
-import InsightsIcon from "@mui/icons-material/Insights";
+// import InsightsIcon from "@mui/icons-material/Insights";
 import SettingsIcon from "@mui/icons-material/Settings";
 
 const ProjectCard = ({ index, project }) => {
   const projectProperties = [
     {
-      value: `${project.savedCount} / ${project.textCount}`,
-      title: "Number of documents completed",
+      value: project.textCount,
+      title: "Total Texts",
       icon: <ArticleIcon fontSize="inherit" color="inherit" />,
     },
     {
-      value: `${Math.round(project.vocabReduction)}%`,
-      title: "Vocabulary reduction",
-      icon: <InsightsIcon fontSize="inherit" color="inherit" />,
+      value: `${project.savedCount} / ${project.textCount}`,
+      title: "Texts Annotated",
+      icon: <ArticleIcon fontSize="inherit" color="inherit" />,
     },
-    {
-      value: `${project.startCandidateVocabSize - project.oovCorrections}
-      / ${project.startCandidateVocabSize}`,
-      title: "Vocabulary corrections",
-      icon: <InsightsIcon fontSize="inherit" color="inherit" />,
-    },
+    // {
+    //   value: `${Math.round(project.vocabReduction)}%`,
+    //   title: "Vocabulary reduction",
+    //   icon: <InsightsIcon fontSize="inherit" color="inherit" />,
+    // },
+    // {
+    //   value: `${project.startCandidateVocabSize - project.oovCorrections}
+    //   / ${project.startCandidateVocabSize}`,
+    //   title: "Vocabulary corrections",
+    //   icon: <InsightsIcon fontSize="inherit" color="inherit" />,
+    // },
     {
       value: project.isParallelCorpusProject ? "Parallel" : "Standard",
-      title: "Project type",
+      title: "Project Type",
       icon: <SettingsIcon fontSize="inherit" color="inherit" />,
     },
   ];
