@@ -28,8 +28,8 @@ export const SpanComponent = styled(Typography)((props) => ({
 }));
 
 const Token = ({ textId, token, tokenIndex }) => {
-  const hasReplacement = token.replacement;
-  const hasSuggestion = token.suggestion;
+  const hasReplacement = token.replacement !== null || token.replacement === "";
+  const hasSuggestion = token.suggestion !== null || token.suggestion === "";
   const isOutOfVocab = !token.en;
   const [editing, setEditing] = useState(false);
   const tokenRef = useRef(null);
@@ -44,11 +44,12 @@ const Token = ({ textId, token, tokenIndex }) => {
 
   const handlePrimaryPopoverClose = () => {
     setAnchorEl(null);
+    console.log(token);
     dispatch({
       type: "UPDATE_TOKEN_VALUE",
       payload: {
-        textId: textId,
-        tokenIndex: tokenIndex,
+        textId,
+        tokenIndex,
         newValue: hasReplacement
           ? token.replacement
           : hasSuggestion
@@ -61,7 +62,7 @@ const Token = ({ textId, token, tokenIndex }) => {
   const handleTokenEdit = (e, newToken) => {
     dispatch({
       type: "UPDATE_TOKEN_VALUE",
-      payload: { textId: textId, tokenIndex: tokenIndex, newValue: newToken },
+      payload: { textId, tokenIndex, newValue: newToken },
     });
     if (token.currentValue !== newToken) {
       handlePrimaryPopoverOpen(e);
@@ -84,7 +85,10 @@ const Token = ({ textId, token, tokenIndex }) => {
 
   const tokenHasSpan = editing || hasReplacement || hasSuggestion;
 
+  const tokenIsEmpty = token.currentValue === "";
+
   const getBaseColor = () => {
+    if (tokenIsEmpty) return theme.palette.token.empty;
     if (editing) return theme.palette.token.editing;
     if (hasReplacement) return theme.palette.token.replacement;
     if (hasSuggestion) return theme.palette.token.suggestion;
@@ -114,6 +118,15 @@ const Token = ({ textId, token, tokenIndex }) => {
     }
   };
 
+  const getBgColor = (tokenColor) => {
+    if (state.selectedToken && state.selectedToken._id === token._id)
+      return alpha(tokenColor, 0.1);
+    if (tokenIsEmpty) return alpha(theme.palette.token.empty, 0.2);
+    return;
+  };
+
+  const tokenBgColor = getBgColor(tokenColor);
+
   return (
     <Stack
       key={tokenIndex}
@@ -134,10 +147,7 @@ const Token = ({ textId, token, tokenIndex }) => {
             textAlign: "center",
             width: getTokenWidth(token.currentValue),
             color: tokenColor,
-            backgroundColor:
-              state.selectedToken &&
-              state.selectedToken._id === token._id &&
-              alpha(tokenColor, 0.1),
+            backgroundColor: tokenBgColor,
             borderRadius: 4,
           },
         }}
@@ -161,7 +171,7 @@ const Token = ({ textId, token, tokenIndex }) => {
       )}
       <Stack direction="column" mt={0.25}>
         {token.tags
-          .filter((labelId) => labelId !== "en") //  && active
+          .filter((labelId) => labelId !== "en")
           .map((labelId) => (
             <SpanEntityAnnotation
               key={`${token._id}-${labelId}`}
