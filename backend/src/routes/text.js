@@ -1,7 +1,6 @@
 import express from "express";
 import logger from "../logger/index.js";
 import Text from "../models/Text.js";
-import Token from "../models/Token.js";
 import Project from "../models/Project.js";
 import Resource from "../models/Resource.js";
 import Annotations from "../models/Annotations.js";
@@ -277,147 +276,147 @@ router.patch("/tokenize", async (req, res) => {
       route: `/api/text/tokenize`,
     });
 
-    const text = await Text.findOne({ _id: req.body.textId })
-      .populate("tokens.token")
-      .lean();
-    const textIndexes = text.tokens.map((token) => token.index);
+    // const text = await Text.findOne({ _id: req.body.textId })
+    //   .populate("tokens.token")
+    //   .lean();
+    // const textIndexes = text.tokens.map((token) => token.index);
 
-    // Get indexes of all those in token piece groups
-    const tokenIndexesTCAll = req.body.indexGroupsTC.flat();
+    // // Get indexes of all those in token piece groups
+    // const tokenIndexesTCAll = req.body.indexGroupsTC.flat();
 
-    // TC: Indexes To Change
-    // Only looks at the first index of each group as this will be where
-    // the new token will be inserted
-    const tokenIndexesTC = req.body.indexGroupsTC.map((group) => group[0]);
+    // // TC: Indexes To Change
+    // // Only looks at the first index of each group as this will be where
+    // // the new token will be inserted
+    // const tokenIndexesTC = req.body.indexGroupsTC.map((group) => group[0]);
 
-    // TK: Indexes To Keep
-    const tokenIndexesTK = textIndexes.filter(
-      (x) => !tokenIndexesTCAll.includes(x)
-    );
+    // // TK: Indexes To Keep
+    // const tokenIndexesTK = textIndexes.filter(
+    //   (x) => !tokenIndexesTCAll.includes(x)
+    // );
 
-    // Convert groups of token indexes into strings
-    // There may be n groups of token pieces
-    let tokenValuesTC = req.body.indexGroupsTC.map((group) =>
-      group.map(
-        (value) =>
-          text.tokens
-            .filter((token) => token.index === value)
-            .map((token) =>
-              token.token.replacement
-                ? token.token.replacement
-                : token.token.value
-            )[0]
-      )
-    );
-    tokenValuesTC = tokenValuesTC.map((valueGroup) => valueGroup.join(""));
-
-    // These are used to update the app store values
-    const tokenIdsTC = text.tokens
-      .filter((token) => tokenIndexesTCAll.includes(token.index))
-      .map((token) => token._id);
-
-    // Create new tokens
-    // const enMap = await Resource.findOne({ type: "en" }).lean();
-    // const enMapSet = new Set(enMap.tokens);
-
-    // Here all historical info will be stripped from new tokens; however they will
-    // be checked if they are in the English lexicon
-    const newTokenList = tokenValuesTC.map((token) => {
-      return {
-        value: token,
-        tags: { en: false }, // enMapSet.has(token)
-        replacement: null,
-        suggestion: null,
-        projectId: text.projectId,
-      };
-    });
-
-    // Insert tokens into Token collection
-    const tokenListRes = await Token.insertMany(newTokenList);
-
-    // Build token array, assign indices and update text
-    // - these are original tokens that remain unchanged, filtered by
-    //   their index
-    const oTokens = text.tokens
-      .map((token) => token.token)
-      .filter((e, i) => {
-        return tokenIndexesTK.indexOf(i) !== -1;
-      });
-    const oTokensPayload = {
-      tokens: tokenIndexesTK.map((originalIndex, sliceIndex) => ({
-        index: originalIndex,
-        token: oTokens[sliceIndex]._id,
-      })),
-    };
-
-    // Add new tokens
-    const nTokensPayload = {
-      tokens: tokenIndexesTC.map((originalIndex, sliceIndex) => ({
-        index: originalIndex,
-        token: tokenListRes[sliceIndex]._id,
-      })),
-    };
-
-    // Get new token Ids to update app store values
-    const newTokenIds = nTokensPayload.tokens.map((token) => token.token);
-
-    // Combine both payloads into single array
-    let tokensPayload = {
-      tokens: [...oTokensPayload["tokens"], ...nTokensPayload["tokens"]],
-    };
-
-    // Sort combined payload by original index
-    tokensPayload["tokens"] = tokensPayload["tokens"].sort(
-      (a, b) => a.index - b.index
-    );
-
-    // update indexes based on current ordering
-    tokensPayload["tokens"] = tokensPayload.tokens.map((token, newIndex) => ({
-      ...token,
-      index: newIndex,
-    }));
-
-    // Capture tokenization group mapping
-    // {original_index : token_group} where token_group is the original token values
-
-    // Update text tokens array with new tokens
-    const newText = await Text.findByIdAndUpdate(
-      { _id: req.body.textId },
-      tokensPayload,
-      {
-        upsert: true,
-        new: true,
-      }
-    )
-      .populate("tokens.token")
-      .lean();
-
-    // const tokenizationMap = req.body.indexGroupsTC.map((group) => ({
-    //   [group[0]]: group.map(
-    //     (token_index) =>
+    // // Convert groups of token indexes into strings
+    // // There may be n groups of token pieces
+    // let tokenValuesTC = req.body.indexGroupsTC.map((group) =>
+    //   group.map(
+    //     (value) =>
     //       text.tokens
-    //         .filter((token) => token.index === token_index)
-    //         .map((token) => ({ index: token.index, info: token.token }))[0]
-    //   ),
+    //         .filter((token) => token.index === value)
+    //         .map((token) =>
+    //           token.token.replacement
+    //             ? token.token.replacement
+    //             : token.token.value
+    //         )[0]
+    //   )
+    // );
+    // tokenValuesTC = tokenValuesTC.map((valueGroup) => valueGroup.join(""));
+
+    // // These are used to update the app store values
+    // const tokenIdsTC = text.tokens
+    //   .filter((token) => tokenIndexesTCAll.includes(token.index))
+    //   .map((token) => token._id);
+
+    // // Create new tokens
+    // // const enMap = await Resource.findOne({ type: "en" }).lean();
+    // // const enMapSet = new Set(enMap.tokens);
+
+    // // Here all historical info will be stripped from new tokens; however they will
+    // // be checked if they are in the English lexicon
+    // const newTokenList = tokenValuesTC.map((token) => {
+    //   return {
+    //     value: token,
+    //     tags: { en: false }, // enMapSet.has(token)
+    //     replacement: null,
+    //     suggestion: null,
+    //     projectId: text.projectId,
+    //   };
+    // });
+
+    // // Insert tokens into Token collection
+    // const tokenListRes = await Token.insertMany(newTokenList);
+
+    // // Build token array, assign indices and update text
+    // // - these are original tokens that remain unchanged, filtered by
+    // //   their index
+    // const oTokens = text.tokens
+    //   .map((token) => token.token)
+    //   .filter((e, i) => {
+    //     return tokenIndexesTK.indexOf(i) !== -1;
+    //   });
+    // const oTokensPayload = {
+    //   tokens: tokenIndexesTK.map((originalIndex, sliceIndex) => ({
+    //     index: originalIndex,
+    //     token: oTokens[sliceIndex]._id,
+    //   })),
+    // };
+
+    // // Add new tokens
+    // const nTokensPayload = {
+    //   tokens: tokenIndexesTC.map((originalIndex, sliceIndex) => ({
+    //     index: originalIndex,
+    //     token: tokenListRes[sliceIndex]._id,
+    //   })),
+    // };
+
+    // // Get new token Ids to update app store values
+    // const newTokenIds = nTokensPayload.tokens.map((token) => token.token);
+
+    // // Combine both payloads into single array
+    // let tokensPayload = {
+    //   tokens: [...oTokensPayload["tokens"], ...nTokensPayload["tokens"]],
+    // };
+
+    // // Sort combined payload by original index
+    // tokensPayload["tokens"] = tokensPayload["tokens"].sort(
+    //   (a, b) => a.index - b.index
+    // );
+
+    // // update indexes based on current ordering
+    // tokensPayload["tokens"] = tokensPayload.tokens.map((token, newIndex) => ({
+    //   ...token,
+    //   index: newIndex,
     // }));
 
-    // Update text tokenization history; TODO: review tokenization history output
-    // const updatedTextRes = await Text.findByIdAndUpdate(
+    // // Capture tokenization group mapping
+    // // {original_index : token_group} where token_group is the original token values
+
+    // // Update text tokens array with new tokens
+    // const newText = await Text.findByIdAndUpdate(
     //   { _id: req.body.textId },
-    //   { $push: { tokenization_hist: tokenizationMap } },
-    //   { upsert: true, new: true }
+    //   tokensPayload,
+    //   {
+    //     upsert: true,
+    //     new: true,
+    //   }
     // )
     //   .populate("tokens.token")
     //   .lean();
 
-    // delete unused tokens
-    const tokenIdsToDelete = text.tokens
-      .map((token) => token)
-      .filter((token) => req.body.indexGroupsTC.flat().includes(token.index))
-      .map((token) => token.token._id);
-    await Token.deleteMany({ _id: { $in: tokenIdsToDelete } });
+    // // const tokenizationMap = req.body.indexGroupsTC.map((group) => ({
+    // //   [group[0]]: group.map(
+    // //     (token_index) =>
+    // //       text.tokens
+    // //         .filter((token) => token.index === token_index)
+    // //         .map((token) => ({ index: token.index, info: token.token }))[0]
+    // //   ),
+    // // }));
 
-    res.json(formatTextOutput(newText));
+    // // Update text tokenization history; TODO: review tokenization history output
+    // // const updatedTextRes = await Text.findByIdAndUpdate(
+    // //   { _id: req.body.textId },
+    // //   { $push: { tokenization_hist: tokenizationMap } },
+    // //   { upsert: true, new: true }
+    // // )
+    // //   .populate("tokens.token")
+    // //   .lean();
+
+    // // delete unused tokens
+    // const tokenIdsToDelete = text.tokens
+    //   .map((token) => token)
+    //   .filter((token) => req.body.indexGroupsTC.flat().includes(token.index))
+    //   .map((token) => token.token._id);
+    // await Token.deleteMany({ _id: { $in: tokenIdsToDelete } });
+
+    // res.json(formatTextOutput(newText));
   } catch (err) {
     res.json({ message: err });
   }
