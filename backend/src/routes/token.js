@@ -1,7 +1,6 @@
 import express from "express";
 import logger from "../logger/index.js";
 import Text from "../models/Text.js";
-import { formatTextOutput } from "../utils/text.js";
 import Annotations from "../models/Annotations.js";
 import mongoose from "mongoose";
 import {
@@ -185,7 +184,7 @@ router.patch("/add", async (req, res) => {
           userId,
           textId,
           tokenId,
-          value: req.body.replacement,
+          value: replacement,
         });
         textTokenIds = { [textId]: [tokenId] };
         annotations.push({ dummy: "token" });
@@ -419,87 +418,56 @@ router.patch("/accept", async (req, res) => {
 //   }
 // });
 
-// router.patch("/remove", async (req, res) => {
-//   /**
-//    * Removes a given token from a text
-//    * TODO: Handle when only one token on text. Don't let user delete it, replace token content with empty string.
-//    */
-//   try {
-//     if (req.body.applyAll) {
-//       const focusToken = await Token.findById({ _id: req.body.tokenId }).lean();
+/**
+ * "Removes" a given token from a text. Sets the value to an empty string. Removal cannot be isSuggestion.
+ */
+router.patch("/remove", async (req, res) => {
+  try {
+    const userId = req.userId;
 
-//       const matchedTokens = await Token.find({
-//         projectId: focusToken.projectId,
-//         value: focusToken.value,
-//       }).lean();
+    let annotations = [];
+    let textTokenIds = {};
 
-//       console.log("matchedTokens", matchedTokens);
+    let { applyAll, tokenId, textId, projectId } = req.body;
 
-//       const matchedTextIds = matchedTokens.map((t) => t.textId);
+    textId = mongoose.Types.ObjectId(req.body.textId);
+    tokenId = mongoose.Types.ObjectId(req.body.tokenId);
+    projectId = mongoose.Types.ObjectId(req.body.projectId);
 
-//       let texts = await Text.find({
-//         _id: { $in: matchedTextIds },
-//         $or: [
-//           {
-//             saved: false, // Exclude user saved texts
-//             _id: focusToken.textId,
-//           },
-//         ],
-//       }).populate("tokens.token");
+    if (applyAll) {
+      console.log("remove many");
+    } else {
+      console.log("remove one");
 
-//       let savedTextIds = texts.map((t) => t._id.toString());
+      const annotation = await Annotations.findOne({
+        tokenId,
+        userId,
+        type: "replacement",
+        value: "",
+      }).lean();
 
-//       console.log("savedTextIds", savedTextIds);
-
-//       texts.forEach((text) => {
-//         text.tokens = text.tokens
-//           .filter((t) => t.token.value !== focusToken.value)
-//           .map((t, index) => ({ index: index, token: t.token }));
-
-//         text.save();
-//       });
-
-//       // NOTE: textTokenObjects here are not equivalent to textTokenIds!
-//       // Only returns current page of texts
-//       res.json({
-//         matches: matchedTokens.filter((t) =>
-//           savedTextIds.includes(t.textId.toString())
-//         ).length,
-//         textTokenObjects: Object.assign(
-//           {},
-//           ...texts
-//             .filter((text) => req.body.textIds.includes(text._id.toString()))
-//             .map((text) => formatTextOutput(text))
-//         ),
-//       });
-//     } else {
-//       let text = await Text.findById({ _id: req.body.textId }).populate(
-//         "tokens.token"
-//       );
-
-//       // console.log("text", text);
-//       // console.log("text tokens before mod", text.tokens.length);
-
-//       // reindex remaining tokens
-//       text.tokens = text.tokens
-//         .filter((t) => t.token._id != req.body.tokenId)
-//         .map((t, index) => ({ index: index, token: t.token }));
-
-//       // console.log("text tokens after mod", text.tokens.length);
-//       // console.log("text tokens", text.tokens);
-
-//       // Update text
-//       text.save();
-
-//       // Delete old tokens (TODO: investigate whether soft delete is better)
-//       await Token.findByIdAndDelete({ _id: req.body.tokenId });
-
-//       res.json({ matches: 1, textTokenObjects: formatTextOutput(text) });
-//     }
-//   } catch (error) {
-//     res.json({ details: error });
-//   }
-// });
+      if (!annotation) {
+        // Create annotation
+        await Annotations.create({
+          type: "replacement",
+          userId,
+          textId,
+          tokenId,
+          value: "",
+        });
+        textTokenIds = { [textId]: [tokenId] };
+        annotations.push({ dummy: "token" });
+      }
+      res.json({
+        matches: annotations.length,
+        textTokenIds,
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    res.json({ details: error });
+  }
+});
 
 /**
  *
