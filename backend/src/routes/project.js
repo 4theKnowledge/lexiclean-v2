@@ -3,7 +3,6 @@ import logger from "../logger/index.js";
 import Project from "../models/Project.js";
 import Resource from "../models/Resource.js";
 import Text from "../models/Text.js";
-import Token from "../models/Token.js";
 import User from "../models/User.js";
 import {
   removeTabs,
@@ -14,10 +13,6 @@ import {
   calculateTFIDF,
 } from "../utils/project.js";
 import { normaliseSpecialTokens } from "../utils/project.js";
-import {
-  getReplacementFrequencies,
-  formatOutputTexts,
-} from "../utils/download.js";
 import Annotations from "../models/Annotations.js";
 import mongoose from "mongoose";
 import {
@@ -415,64 +410,36 @@ router.get("/feed", async (req, res) => {
 
   try {
     const userId = req.userId;
+    const projects = await Project.find({ user: userId }).lean();
 
-    if (userId) {
-      const projects = await Project.find({ user: userId }).lean();
+    const output = await Promise.all(
+      projects.map(async (project) => {
+        const savedTexts = await Annotations.count({
+          userId,
+          textId: { $in: project.texts },
+          type: "save",
+        });
 
-      const feedInfo = await Promise.all(
-        projects.map(async (project) => {
-          const allTokens = null;
-          const savedTexts = await Text.count({
-            projectId: project._id,
-            saved: true,
-          });
-          const tokens = await Token.find({ projectId: project._id }).lean();
-
-          const uniqueTokens = new Set(
-            tokens
-              .map((token) =>
-                token.replacement ? token.replacement : token.value
-              )
-              .flat()
-          ).size;
-
-          const currentOOVTokens = tokens
-            .filter(
-              (token) =>
-                Object.values(token.tags).filter((tagBool) => tagBool)
-                  .length === 0 && !token.replacement
-            )
-            .map((token) => token.value).length;
-
-          // console.log(project);
-
-          return {
-            _id: project._id,
-            isParallelCorpusProject: project.parallelCorpus,
-            name: project.name,
-            description: project.description,
-            startCandidateVocabSize: project.metrics.startCandidateVocabSize,
-            startVocabSize: project.metrics.startVocabSize,
-            startTokenCount: project.startTokenCount,
-            textCount: project.texts.length,
-            savedCount: savedTexts,
-            vocabReduction:
-              ((project.metrics.startVocabSize - uniqueTokens) /
-                project.metrics.startVocabSize) *
-              100,
-            oovCorrections: currentOOVTokens,
-            createdAt: project.createdAt,
-          };
-        })
-      );
-
-      res.json(feedInfo);
-    } else {
-      res.json({ message: "token invalid" });
-      logger.error("Failed to fetch project feed - token invalid", {
-        route: "/api/project/feed",
-      });
-    }
+        return {
+          _id: project._id,
+          isParallelCorpusProject: project.parallelCorpus,
+          name: project.name,
+          description: project.description,
+          startCandidateVocabSize: project.metrics.startCandidateVocabSize,
+          startVocabSize: project.metrics.startVocabSize,
+          startTokenCount: project.startTokenCount,
+          textCount: project.texts.length,
+          savedCount: savedTexts,
+          vocabReduction: 0,
+          // ((project.metrics.startVocabSize - uniqueTokens) /
+          //   project.metrics.startVocabSize) *
+          // 100,
+          oovCorrections: 0, //currentOOVTokens,
+          createdAt: project.createdAt,
+        };
+      })
+    );
+    res.json(output);
   } catch (err) {
     res.json({ message: err });
     logger.error("Failed to fetch project feed", {
@@ -618,67 +585,63 @@ router.get("/progress/:projectId", projectAccessCheck, async (req, res) => {
  */
 router.get("/metrics/:projectId", projectAccessCheck, async (req, res) => {
   try {
-    const project = await Project.findById({
-      _id: req.params.projectId,
-    }).lean();
-    const textsTotal = await Text.count({ projectId: req.params.projectId });
-    const textsSaved = await Text.count({
-      projectId: req.params.projectId,
-      saved: true,
-    });
-    const tokens = await Token.find({
-      projectId: req.params.projectId,
-    }).lean();
-
-    // Capture the number of tokens that exist in the original values or
-    // introduced through replacements (if a token has one)
-    const vocabSize = new Set(
-      tokens.map((token) =>
-        token.replacement ? token.replacement : token.value
-      )
-    ).size;
-
-    // Capture the number of tokens that are OOV e.g. have no meta-tags that are true
-    // including English and do not have a current replacement.
-    const oovTokenLength = tokens
-      .filter(
-        (token) =>
-          Object.values(token.tags).filter((tagBool) => tagBool).length === 0 &&
-          !token.replacement
-      )
-      .map((token) => token.value).length;
-
-    const payload = [
-      {
-        description: "Texts Annotated",
-        detail: `${textsSaved} / ${textsTotal}`,
-        value: `${Math.round((textsSaved * 100) / textsTotal)}%`,
-        title: "Texts that have had classifications or replacements.",
-      },
-      {
-        description: "Vocabulary Reduction",
-        detail: `${vocabSize} / ${project.metrics.startVocabSize}`,
-        value: `${Math.round(
-          (1 - vocabSize / project.metrics.startVocabSize) * 100
-        )}%`,
-        title:
-          "Comparison between of current vocabulary and starting vocabulary",
-      },
-      {
-        description: "Vocabulary Corrections",
-        detail: `${
-          project.metrics.startCandidateVocabSize - oovTokenLength
-        } / ${project.metrics.startCandidateVocabSize}`,
-        value: `${Math.round(
-          ((project.metrics.startCandidateVocabSize - oovTokenLength) * 100) /
-            project.metrics.startCandidateVocabSize
-        )}%`,
-        title:
-          "Sum of all outstanding out-of-vocabulary tokens. All tokens replaced and/or classified with meta-tags are captured",
-      },
-    ];
-
-    res.json(payload);
+    // const project = await Project.findById({
+    //   _id: req.params.projectId,
+    // }).lean();
+    // const textsTotal = await Text.count({ projectId: req.params.projectId });
+    // const textsSaved = await Text.count({
+    //   projectId: req.params.projectId,
+    //   saved: true,
+    // });
+    // const tokens = await Token.find({
+    //   projectId: req.params.projectId,
+    // }).lean();
+    // // Capture the number of tokens that exist in the original values or
+    // // introduced through replacements (if a token has one)
+    // const vocabSize = new Set(
+    //   tokens.map((token) =>
+    //     token.replacement ? token.replacement : token.value
+    //   )
+    // ).size;
+    // // Capture the number of tokens that are OOV e.g. have no meta-tags that are true
+    // // including English and do not have a current replacement.
+    // const oovTokenLength = tokens
+    //   .filter(
+    //     (token) =>
+    //       Object.values(token.tags).filter((tagBool) => tagBool).length === 0 &&
+    //       !token.replacement
+    //   )
+    //   .map((token) => token.value).length;
+    // const payload = [
+    //   {
+    //     description: "Texts Annotated",
+    //     detail: `${textsSaved} / ${textsTotal}`,
+    //     value: `${Math.round((textsSaved * 100) / textsTotal)}%`,
+    //     title: "Texts that have had classifications or replacements.",
+    //   },
+    //   {
+    //     description: "Vocabulary Reduction",
+    //     detail: `${vocabSize} / ${project.metrics.startVocabSize}`,
+    //     value: `${Math.round(
+    //       (1 - vocabSize / project.metrics.startVocabSize) * 100
+    //     )}%`,
+    //     title:
+    //       "Comparison between of current vocabulary and starting vocabulary",
+    //   },
+    //   {
+    //     description: "Vocabulary Corrections",
+    //     detail: `${
+    //       project.metrics.startCandidateVocabSize - oovTokenLength
+    //     } / ${project.metrics.startCandidateVocabSize}`,
+    //     value: `${Math.round(
+    //       ((project.metrics.startCandidateVocabSize - oovTokenLength) * 100) /
+    //         project.metrics.startCandidateVocabSize
+    //     )}%`,
+    //     title:
+    //       "Sum of all outstanding out-of-vocabulary tokens. All tokens replaced and/or classified with meta-tags are captured",
+    //   },
+    // ];
+    // res.json(payload);
   } catch (err) {
     res.json({ message: err });
   }
