@@ -1,4 +1,4 @@
-import { Stack, TextField, Typography } from "@mui/material";
+import { Grid, Stack, TextField, Typography } from "@mui/material";
 
 const Details = ({ values, updateValue }) => {
   return (
@@ -41,26 +41,29 @@ const CustomTextField = ({
   caption,
   placeholder,
 }) => (
-  <Stack direction="column" spacing={1}>
-    <Typography fontWeight={500} color="text.secondary">
-      {title}
-    </Typography>
-    <Typography fontSize={12} color="text.secondary">
-      {caption}
-    </Typography>
-
-    <TextField
-      key={`${title}-textfield"`}
-      type="text"
-      margin="normal"
-      fullWidth
-      placeholder={placeholder}
-      value={value}
-      autoComplete="false"
-      onChange={(e) => setValueFunction(e.target.value)}
-      size="small"
-    />
-  </Stack>
+  <Grid container alignItems="center">
+    <Grid item xs={6} pr={4}>
+      <Typography fontWeight={500} color="text.secondary">
+        {title}
+      </Typography>
+      <Typography fontSize={12} color="text.secondary">
+        {caption}
+      </Typography>
+    </Grid>
+    <Grid item xs={6}>
+      <TextField
+        key={`${title}-textfield"`}
+        type="text"
+        margin="normal"
+        fullWidth
+        placeholder={placeholder}
+        value={value}
+        autoComplete="false"
+        onChange={(e) => setValueFunction(e.target.value)}
+        size="small"
+      />
+    </Grid>
+  </Grid>
 );
 
 export default Details;
