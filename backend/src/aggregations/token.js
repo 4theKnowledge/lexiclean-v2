@@ -6,7 +6,7 @@ import mongoose from "mongoose";
  *
  * @param {Object} params - Parameters for the pipeline.
  * @param {string} params.projectId - MongoDB ObjectId of the project.
- * @param {string} [params.searchTerm=""] - Term to filter tokens. Defaults to an empty string to match all tokens.
+ * @param {string} [params.searchTerm=null] - Term to filter tokens. Defaults to null to ensure empty strings are not erroneously matched.
  * @param {Array<string>} [params.excludeTokenIds=[]] - Array of token ObjectIds to exclude.
  *
  * @returns {Array<Object>} - Aggregation pipeline for filtering and retrieving tokens.
@@ -20,7 +20,7 @@ import mongoose from "mongoose";
  */
 export const textTokenSearchPipeline = ({
   projectId,
-  searchTerm = "",
+  searchTerm = null,
   excludeTokenIds = [],
 }) => [
   {
@@ -36,7 +36,7 @@ export const textTokenSearchPipeline = ({
           as: "token",
           cond: {
             $and: [
-              searchTerm
+              searchTerm !== null
                 ? {
                     $regexMatch: {
                       input: "$$token.value",
@@ -44,7 +44,7 @@ export const textTokenSearchPipeline = ({
                       options: "i",
                     },
                   }
-                : true, // This condition is always true if searchTerm is empty
+                : {},
               {
                 $not: [
                   {
