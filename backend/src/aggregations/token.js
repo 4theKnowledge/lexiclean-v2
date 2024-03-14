@@ -1,10 +1,26 @@
 import mongoose from "mongoose";
+
 /**
- * Returns an array of tokens matching a given search term.
+ * Creates a MongoDB aggregation pipeline to retrieve tokens from texts in a specified project.
+ * Filters tokens by a search term (if provided) and excludes tokens by IDs. Matches all tokens if no search term is given.
+ *
+ * @param {Object} params - Parameters for the pipeline.
+ * @param {string} params.projectId - MongoDB ObjectId of the project.
+ * @param {string} [params.searchTerm=""] - Term to filter tokens. Defaults to an empty string to match all tokens.
+ * @param {Array<string>} [params.excludeTokenIds=[]] - Array of token ObjectIds to exclude.
+ *
+ * @returns {Array<Object>} - Aggregation pipeline for filtering and retrieving tokens.
+ *
+ * Steps:
+ * 1. Match documents by projectId.
+ * 2. Project tokens based on search criteria and exclusion list.
+ * 3. Unwind tokens for individual processing.
+ * 4. Add textId and tokenId fields to link tokens to their texts.
+ * 5. Remove the original _id field.
  */
 export const textTokenSearchPipeline = ({
   projectId,
-  searchTerm,
+  searchTerm = "",
   excludeTokenIds = [],
 }) => [
   {
@@ -20,13 +36,15 @@ export const textTokenSearchPipeline = ({
           as: "token",
           cond: {
             $and: [
-              {
-                $regexMatch: {
-                  input: "$$token.value",
-                  regex: searchTerm,
-                  options: "i",
-                },
-              },
+              searchTerm
+                ? {
+                    $regexMatch: {
+                      input: "$$token.value",
+                      regex: searchTerm,
+                      options: "i",
+                    },
+                  }
+                : true, // This condition is always true if searchTerm is empty
               {
                 $not: [
                   {
