@@ -217,6 +217,8 @@ router.patch("/delete", async (req, res) => {
     let annotations = [];
     let textTokenIds = {};
 
+    console.log("originalValue: ", originalValue);
+
     if (applyAll) {
       const matchingTokens = await Text.aggregate(
         textTokenSearchPipeline({
@@ -225,7 +227,7 @@ router.patch("/delete", async (req, res) => {
         })
       );
 
-      // console.log("matchingTokens: ", matchingTokens);
+      console.log("matchingTokens: ", matchingTokens);
 
       const matchingTokenIds = matchingTokens.map((t) =>
         mongoose.Types.ObjectId(t.tokenId)
@@ -234,11 +236,16 @@ router.patch("/delete", async (req, res) => {
         userId,
         tokenId,
       }).lean();
-      const focusTokenIsSuggestion = focusTokenAnnotation?.isSuggestion;
-      // console.log("focusTokenIsSuggestion: ", focusTokenIsSuggestion);
+      // console.log("focusTokenAnnotation: ", focusTokenAnnotation);
+      const focusTokenIsSuggestion = focusTokenAnnotation.isSuggestion;
+      console.log("focusTokenIsSuggestion: ", focusTokenIsSuggestion);
 
-      let queryConditions = { userId, tokenId: { $in: matchingTokenIds } };
-      if (focusTokenIsSuggestion !== undefined) {
+      let queryConditions = {
+        userId,
+        tokenId: { $in: matchingTokenIds },
+        value: focusTokenAnnotation.value,
+      };
+      if (focusTokenIsSuggestion) {
         // Directly use the boolean value of focusTokenIsSuggestion
         queryConditions.isSuggestion = focusTokenIsSuggestion;
       } else {
@@ -436,6 +443,7 @@ router.patch("/remove", async (req, res) => {
 
     if (applyAll) {
       console.log("remove many");
+      // ...
     } else {
       console.log("remove one");
 
@@ -443,10 +451,19 @@ router.patch("/remove", async (req, res) => {
         tokenId,
         userId,
         type: "replacement",
-        value: "",
       }).lean();
 
-      if (!annotation) {
+      if (annotation) {
+        // If token has replacement or suggestion, it will be converted into replacement with empty string.
+        await Annotations.updateOne(
+          {
+            _id: annotation._id,
+          },
+          { $set: { isSuggestion: false, value: "" } }
+        );
+        textTokenIds = { [textId]: [tokenId] };
+        annotations.push({ dummy: "token" });
+      } else {
         // Create annotation
         await Annotations.create({
           type: "replacement",
@@ -458,11 +475,11 @@ router.patch("/remove", async (req, res) => {
         textTokenIds = { [textId]: [tokenId] };
         annotations.push({ dummy: "token" });
       }
-      res.json({
-        matches: annotations.length,
-        textTokenIds,
-      });
     }
+    res.json({
+      matches: annotations.length,
+      textTokenIds,
+    });
   } catch (error) {
     console.log(error);
     res.json({ details: error });
