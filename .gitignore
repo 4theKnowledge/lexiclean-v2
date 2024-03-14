@@ -38,3 +38,7 @@ backend/logger/logs.json
 backend/src/logger/logs.json
 
 data/*
+
+server/*
+TODO.md
+NOTES.md
