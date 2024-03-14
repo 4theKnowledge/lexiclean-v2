@@ -77,6 +77,20 @@ const useProjectActions = () => {
     }
   };
 
+  const getProjectName = async ({ projectId }) => {
+    try {
+      const data = await callApi(`/api/project/${projectId}`, {
+        method: "GET",
+      });
+      if (data) {
+        return data.name;
+      }
+    } catch (error) {
+      console.log(`error fetching project: ${error}`);
+      throw error; // Rethrow to handle it in the calling function
+    }
+  };
+
   const getTexts = async ({ projectId, filters = {}, page, limit }) => {
     /**
      * projectId : project id
@@ -135,6 +149,7 @@ const useProjectActions = () => {
     getProject,
     getTexts,
     saveTexts,
+    getProjectName,
   };
 };
 
