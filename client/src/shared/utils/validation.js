@@ -17,22 +17,48 @@ export const ValidateCreateUpload = (corpus) => {
   return false;
 };
 
-export const ValidateCreatePreannotation = (replacementDictionary) => {
-  if (Object.keys(replacementDictionary).length === 0) {
-    return true;
-  }
+export const ValidateCreatePreannotation = () => {
+  return true;
 };
 
 export const ValidateCreateReview = (
   detailsValid,
   schemaValid,
   uploadValid,
-  preannotationValid
+  preannotationValid,
+  replacementsValid
 ) => {
   return checkValid([
     detailsValid,
     schemaValid,
     uploadValid,
     preannotationValid,
+    replacementsValid,
   ]);
+};
+
+export const ValidateCreateReplacements = (json, setError = () => {}) => {
+  try {
+    const obj = JSON.parse(json);
+    const keys = Object.keys(obj);
+
+    // Check for unique keys and single-word keys/values
+    const hasInvalidKeysOrValues = keys.some(
+      (key) =>
+        key.includes(" ") ||
+        typeof obj[key] !== "string" ||
+        obj[key].includes(" ")
+    );
+
+    if (hasInvalidKeysOrValues) {
+      setError("Keys and values must be single words without spaces.");
+      return false;
+    }
+
+    setError("");
+    return true;
+  } catch (e) {
+    setError("Invalid JSON format.");
+    return false;
+  }
 };
