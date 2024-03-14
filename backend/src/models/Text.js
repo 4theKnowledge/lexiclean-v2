@@ -18,7 +18,7 @@ const TokenSchema = new Schema(
     },
   },
   { _id: true }
-); // Enable _id for each token, it's enabled by default but included here for clarity
+);
 
 const TextSchema = new mongoose.Schema(
   {
@@ -45,25 +45,7 @@ const TextSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    // saved: [
-    //   {
-    //     type: Schema.Types.ObjectId,
-    //     ref: "User",
-    //     required: false,
-    //   },
-    // ],
-    // tokenizationHistory: [{ type: Schema.Types.Mixed, required: false }],
     identifiers: [{ type: String }],
-    // flags: [
-    //   {
-    //     user: {
-    //       type: Schema.Types.ObjectId,
-    //       ref: "User",
-    //       required: true,
-    //     },
-    //     value: { type: "String", required: true },
-    //   },
-    // ],
   },
   { _id: true, timestamps: true }
 );
