@@ -64,6 +64,7 @@ export const ThemeProvider = ({ children }) => {
               editing: green[500],
               strike: red[500],
               replacement: green[500],
+              empty: red[500],
             },
           }
         : {
@@ -95,6 +96,7 @@ export const ThemeProvider = ({ children }) => {
               editing: green[500],
               strike: red[500],
               replacement: green[500],
+              empty: red[500],
             },
           }),
     },
