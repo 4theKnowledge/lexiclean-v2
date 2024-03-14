@@ -14,7 +14,6 @@ import Details from "./steps/Details";
 import Upload from "./steps/upload/Upload";
 import Preprocessing from "./steps/Preprocessing";
 import Schema from "./steps/Schema";
-import Labelling from "./steps/Labelling";
 import Preannotation from "./steps/Preannotation";
 import DoneIcon from "@mui/icons-material/Done";
 import WarningIcon from "@mui/icons-material/Warning";
@@ -24,9 +23,11 @@ import {
   ValidateCreateUpload,
   ValidateCreatePreannotation,
   ValidateCreateReview,
+  ValidateCreateReplacements,
 } from "../../shared/utils/validation";
 import useProjectActions from "../../shared/hooks/api/project";
 import Flags from "./steps/Flags";
+import Replacements from "./steps/Replacements";
 
 const CreateProject = () => {
   const { createProject } = useProjectActions();
@@ -34,11 +35,12 @@ const CreateProject = () => {
 
   const [stepValidation, setStepValidation] = useState({
     details: false,
-    schema: false,
     upload: false,
     preprocessing: false,
+    replacements: false,
+    schema: false,
     flags: true,
-    preannotation: false,
+    preannotation: true,
     review: false,
   });
 
@@ -57,11 +59,14 @@ const CreateProject = () => {
     preprocessRemoveDuplicates: false,
     preprocessRemoveChars: false,
     preprocessRemoveCharSet: '~",?;!:()[]_{}*.$',
-    replacementDictionary: {},
+    replacementDictionary: "{}",
     replacementDictionaryFileName: null,
     tags: [],
     flags: [],
-    preannotationDigitsIV: false,
+    preannotationReplacements: true,
+    preannotationSchema: false,
+    preannotationDigits: false,
+    preannotationRanking: true,
   };
 
   const [values, setValues] = useState(initialState);
@@ -81,12 +86,6 @@ const CreateProject = () => {
       title: "Details",
       valid: stepValidation.details,
     },
-    schema: {
-      component: <Schema values={values} updateValue={updateValue} />,
-      description: "Build a schema for multi-task token annotation",
-      title: "Schema",
-      valid: stepValidation.schema,
-    },
     upload: {
       component: <Upload values={values} updateValue={updateValue} />,
       description: "Create or upload a corpus",
@@ -99,6 +98,18 @@ const CreateProject = () => {
       title: "Preprocessing",
       valid: stepValidation.preprocessing,
     },
+    replacements: {
+      component: <Replacements values={values} updateValue={updateValue} />,
+      description: "Create or upload a replacement dictionary.",
+      title: "Replacements",
+      valid: stepValidation.replacements,
+    },
+    schema: {
+      component: <Schema values={values} updateValue={updateValue} />,
+      description: "Build a schema for multi-task token annotation",
+      title: "Schema",
+      valid: stepValidation.schema,
+    },
     flags: {
       component: <Flags values={values} updateValue={updateValue} />,
       description: "Specify a set of flags which can be applied to texts",
@@ -108,7 +119,7 @@ const CreateProject = () => {
     preannotation: {
       component: <Preannotation values={values} updateValue={updateValue} />,
       description: "Upload data for pre-annotation",
-      title: "Preannotation",
+      title: "Settings",
       valid: stepValidation.preannotation,
     },
   };
@@ -145,11 +156,17 @@ const CreateProject = () => {
     );
     updateStepValidation("preannotation", preannotationValid);
 
+    const replacementsValid = ValidateCreateReplacements(
+      values["replacementDictionary"]
+    );
+    updateStepValidation("replacements", replacementsValid);
+
     const reviewValid = ValidateCreateReview(
       detailsValid,
       schemaValid,
       uploadValid,
-      preannotationValid
+      preannotationValid,
+      replacementsValid
     );
 
     updateStepValidation("review", reviewValid);
