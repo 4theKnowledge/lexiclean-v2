@@ -1,4 +1,4 @@
-// Collection for annotations - token replacements/suggestions, token-level entity tags, flags, saved states, etc.
+// Collection for annotations - token replacements/suggestions, token-level entity tags, flags, saved states, removal, etc.
 import mongoose from "mongoose";
 const Schema = mongoose.Schema;
 
@@ -9,7 +9,7 @@ const AnnotationSchema = mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ["flag", "save", "tag", "replacement"],
+      enum: ["flag", "save", "tag", "replacement"], // , "removed"
     },
     userId: {
       type: Schema.Types.ObjectId,
@@ -41,6 +41,8 @@ const AnnotationSchema = mongoose.Schema(
               return typeof value === "string";
             case "save":
               return typeof value === "boolean";
+            // case "removed":
+            //   return typeof value === "boolean";
             default:
               return false; // Invalid type, validation fails
           }
