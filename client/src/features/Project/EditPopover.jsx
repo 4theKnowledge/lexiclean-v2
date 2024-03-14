@@ -18,19 +18,18 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import { useTheme } from "@mui/material/styles";
 import useAnnotationActions from "../../shared/hooks/api/annotation";
 
-const EditPopover = (props) => {
-  const {
-    textId,
-    tokenId,
-    tokenIndex,
-    handlePopoverClose,
-    setAnchorEl,
-    originalValue,
-    currentValue,
-    hasSuggestion,
-    hasReplacement,
-    editing,
-  } = props;
+const EditPopover = ({
+  textId,
+  tokenId,
+  tokenIndex,
+  handlePopoverClose,
+  setAnchorEl,
+  originalValue,
+  currentValue,
+  hasSuggestion,
+  hasReplacement,
+  editing,
+}) => {
   const [state, dispatch] = useContext(ProjectContext);
   const navigate = useNavigate();
   const [showExtraOptions, setShowExtraOptions] = useState(false);
@@ -43,6 +42,8 @@ const EditPopover = (props) => {
     splitTokenAction,
     removeTokenAction,
   } = useAnnotationActions();
+
+  const tokenIsEmpty = currentValue === "";
 
   const handleApplyAction = async (applyAll) => {
     try {
@@ -111,6 +112,7 @@ const EditPopover = (props) => {
       applyAll,
       textIds: Object.keys(state.texts),
       originalValue,
+      tokenIndex,
     });
   };
 
@@ -257,7 +259,7 @@ const EditPopover = (props) => {
               </IconButton>
             </Tooltip>
           ))}
-        {showExtraOptions || !showOperations ? (
+        {!tokenIsEmpty && (showExtraOptions || !showOperations) ? (
           <>
             {showOperations && <Divider orientation="vertical" />}
             {/* <Tooltip title="Click to perform a quick filter on this token">
@@ -282,7 +284,7 @@ const EditPopover = (props) => {
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="Click to remove this token">
+            <Tooltip title="Click to delete this token">
               <IconButton
                 size="small"
                 onClick={() => handleRemoveTokenAction(false)}
@@ -290,16 +292,16 @@ const EditPopover = (props) => {
                 <DeleteIcon size="small" sx={{ fontSize: "1rem" }} />
               </IconButton>
             </Tooltip>
-            {/* <Tooltip title="Click to remove this token from the corpus">
+            <Tooltip title="Click to delete this token from the corpus">
               <IconButton
                 size="small"
                 onClick={() => handleRemoveTokenAction(true)}
               >
                 <DeleteSweep size="small" sx={{ fontSize: "1rem" }} />
               </IconButton>
-            </Tooltip> */}
+            </Tooltip>
           </>
-        ) : (
+        ) : !tokenIsEmpty ? (
           <Tooltip title="Click to show more options">
             <IconButton
               size="small"
@@ -308,7 +310,7 @@ const EditPopover = (props) => {
               <MoreHorizIcon size="small" sx={{ fontSize: "1rem" }} />
             </IconButton>
           </Tooltip>
-        )}
+        ) : null}
       </Stack>
     </Stack>
   );
