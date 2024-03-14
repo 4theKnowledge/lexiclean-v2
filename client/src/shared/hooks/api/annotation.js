@@ -102,15 +102,23 @@ const useAnnotationActions = () => {
           payload: {
             ...payload,
             ...data,
-            tokenIndex: tokenIndex,
-            originalValue: originalValue,
-            currentValue: currentValue,
+            tokenIndex,
+            originalValue,
+            currentValue,
           },
         });
 
-        const successMessage = applyAll
+        const tokenIsEmpty = currentValue === "";
+
+        let successMessage = applyAll
           ? `Token '${originalValue}' deleted for ${data.matches} instances successfully.`
           : `Token '${originalValue}' deleted for the current instance successfully.`;
+
+        if (tokenIsEmpty) {
+          successMessage = applyAll
+            ? `Recovered '${originalValue}' from ${data.matches} tokens across all texts successfully.`
+            : `Recovered '${originalValue}' from the current token successfully.`;
+        }
 
         snackbarDispatch({
           type: "SHOW",
@@ -211,7 +219,11 @@ const useAnnotationActions = () => {
     }
   };
 
+  /**
+   * Removing tokens essentially performs a replacement annotation where the replacmeent is an empty string.
+   */
   const removeTokenAction = async ({
+    tokenIndex,
     textId,
     tokenId,
     applyAll,
@@ -220,30 +232,40 @@ const useAnnotationActions = () => {
   }) => {
     try {
       const payload = {
-        textId,
+        projectId,
         tokenId,
+        textId,
         applyAll,
         texIds,
+        originalValue,
       };
 
       const data = await callApi("/api/token/remove", {
         method: "PATCH",
         data: payload,
       });
+
       if (data) {
         dispatch({
-          type: "TOKEN_REMOVE",
+          type: "TOKEN_APPLY",
           payload: {
             ...payload,
             ...data,
+            replacement: "",
+            tokenIndex,
             originalValue,
           },
         });
+        const successMessage =
+          data.matches === 0
+            ? "No changes made."
+            : applyAll
+            ? `Removed '${originalValue}' from texts ${data.matches} times successfully.`
+            : `Removed '${originalValue}' from the current text successfully.`;
+
         snackbarDispatch({
           type: "SHOW",
-          message: `Permanently removed token ${originalValue} ${
-            applyAll ? "in all texts" : "occurrence"
-          }`,
+          message: successMessage,
           severity: "success",
         });
       }
