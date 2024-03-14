@@ -68,7 +68,7 @@ const useDashboardActions = () => {
     try {
       const data = await callApi(`/api/schema/${projectId}`, {
         method: "POST",
-        data: { tags: newTags },
+        data: { tags: newTags, projectId },
       });
 
       return data;
