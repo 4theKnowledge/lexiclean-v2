@@ -20,6 +20,7 @@ import Annotators from "./Annotators";
 import useDashboardActions from "../../shared/hooks/api/dashboard";
 import LoadingButton from "@mui/lab/LoadingButton";
 import Flags from "./Flags";
+import Replacements from "./Replacements";
 
 const Dashboard = () => {
   const { projectId } = useParams();
@@ -64,7 +65,7 @@ const Dashboard = () => {
 
   const handleUpdateSchema = async (key, newValue) => {
     const data = await updateProjectSchema({
-      projectId: projectId,
+      projectId,
       newTags: newValue,
     });
 
@@ -178,6 +179,9 @@ const Dashboard = () => {
           />
         </Grid>
         <Grid item xs={12}>
+          <Replacements loading={loading} data={data} />
+        </Grid>
+        <Grid item xs={12}>
           <Annotators
             loading={loading}
             data={data}
@@ -219,7 +223,7 @@ const Dashboard = () => {
             spacing={1}
           >
             <Typography variant="body2">
-              Reminder: Start annotating by clicking "Annotate"
+              To begin annotating, simply click "Annotate."
             </Typography>
             {/* Save changes with "Update," or */}
             <Stack direction="row" spacing={2}>
