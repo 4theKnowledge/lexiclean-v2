@@ -179,7 +179,9 @@ const EditPopover = ({
       name: "apply-all",
       icon: <ContentPasteIcon fontSize="inherit" />,
       color: teal[500],
-      title: `Apply correction across entire project`,
+      title: `Apply ${
+        tokenIsEmpty ? "deletion" : "correction"
+      } across entire project`,
       action: () => handleApplyAction(true),
       show: showReplacementOperations,
     },
@@ -196,7 +198,7 @@ const EditPopover = ({
       name: "delete-one",
       icon: <UndoIcon fontSize="inherit" />,
       color: orange[500],
-      title: `Undo this correction`,
+      title: `Undo this ${tokenIsEmpty ? "deletion" : "correction"}`,
       action: () => handleDeleteAction(false),
       show: showDeleteOperations,
     },
@@ -204,7 +206,9 @@ const EditPopover = ({
       name: "delete-all",
       icon: <RestoreIcon fontSize="inherit" />,
       color: red[500],
-      title: `Undo all corrections of this type`,
+      title: `Undo all ${
+        tokenIsEmpty ? "deletions" : "corrections"
+      } of this type`,
       action: () => handleDeleteAction(true),
       show: showDeleteOperations,
     },
@@ -284,7 +288,7 @@ const EditPopover = ({
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip title="Click to delete this token">
+            <Tooltip title="Click to remove this token">
               <IconButton
                 size="small"
                 onClick={() => handleRemoveTokenAction(false)}
@@ -292,7 +296,7 @@ const EditPopover = ({
                 <DeleteIcon size="small" sx={{ fontSize: "1rem" }} />
               </IconButton>
             </Tooltip>
-            <Tooltip title="Click to delete this token from the corpus">
+            <Tooltip title="Click to remove this token from the corpus">
               <IconButton
                 size="small"
                 onClick={() => handleRemoveTokenAction(true)}
