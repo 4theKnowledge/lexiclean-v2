@@ -1,5 +1,12 @@
 import { useState, useEffect, useContext, useRef } from "react";
-import { Typography, Stack, TextField, Popover } from "@mui/material";
+import {
+  Typography,
+  Stack,
+  TextField,
+  Popover,
+  Divider,
+  Box,
+} from "@mui/material";
 import { styled } from "@mui/material/styles";
 import EditPopover from "./EditPopover";
 import { alpha } from "@mui/material/styles";
@@ -206,18 +213,39 @@ const Token = ({ textId, token, tokenIndex }) => {
           },
         }}
       >
-        <EditPopover
-          textId={textId}
-          tokenId={token._id}
-          tokenIndex={tokenIndex}
-          handlePopoverClose={handlePrimaryPopoverClose}
-          setAnchorEl={setAnchorEl}
-          originalValue={token.value}
-          currentValue={token.currentValue}
-          hasSuggestion={hasSuggestion}
-          hasReplacement={hasReplacement}
-          editing={editing}
-        />
+        <Box>
+          <Box
+            sx={{
+              textAlign: "center",
+              backgroundColor: alpha(tokenColor, 0.5),
+            }}
+          >
+            <Typography variant="body2" color={tokenColor} fontWeight="bold">
+              {tokenIsEmpty
+                ? "Removed"
+                : hasReplacement
+                ? "Replacement"
+                : hasSuggestion
+                ? "Suggestion"
+                : editing
+                ? "Editing"
+                : null}
+            </Typography>
+          </Box>
+          <Divider />
+          <EditPopover
+            textId={textId}
+            tokenId={token._id}
+            tokenIndex={tokenIndex}
+            handlePopoverClose={handlePrimaryPopoverClose}
+            setAnchorEl={setAnchorEl}
+            originalValue={token.value}
+            currentValue={token.currentValue}
+            hasSuggestion={hasSuggestion}
+            hasReplacement={hasReplacement}
+            editing={editing}
+          />
+        </Box>
       </Popover>
     </Stack>
   );
