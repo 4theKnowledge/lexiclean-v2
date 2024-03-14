@@ -24,7 +24,7 @@ import { teal } from "@mui/material/colors";
 import { useAppContext } from "../../shared/context/AppContext";
 import useProjectActions from "../../shared/hooks/api/project";
 import FlagIcon from "@mui/icons-material/Flag";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import useAnnotationActions from "../../shared/hooks/api/annotation";
 
 const ActionTray = ({ textId, textIndex }) => {
@@ -37,7 +37,7 @@ const ActionTray = ({ textId, textIndex }) => {
 
   const handleSave = async (textId, saveState) => {
     await saveTexts({
-      projectId: projectId,
+      projectId,
       textIds: [textId],
       isSaved: saveState,
     });
@@ -160,7 +160,7 @@ const ActionTray = ({ textId, textIndex }) => {
             />
           </span>
         </Tooltip>
-        <TrayChip textId={textId} />
+        <TrayFlagChip textId={textId} />
         <Divider orientation="vertical" flexItem />
         <Tooltip title="Click to get AI suggestion" placement="top">
           <Chip
@@ -228,7 +228,9 @@ const ActionTray = ({ textId, textIndex }) => {
   );
 };
 
-const TrayChip = ({ textId }) => {
+const TrayFlagChip = ({ textId }) => {
+  const { projectId } = useParams();
+
   const [state, dispatch] = useContext(ProjectContext);
   const { addFlag, deleteFlag } = useAnnotationActions();
   const [anchorEl, setAnchorEl] = useState(null);
@@ -284,16 +286,35 @@ const TrayChip = ({ textId }) => {
         anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
       >
         <MenuList dense>
-          {state.project.flags.map((option, index) => (
-            <FlagMenuItem
-              state={state}
-              textId={textId}
-              option={option._id}
-              label={option.name}
-              onClick={handleFlagClick}
-              index={index}
-            />
-          ))}
+          {state.project.flags.length > 0 ? (
+            state.project.flags.map((option, index) => (
+              <FlagMenuItem
+                state={state}
+                textId={textId}
+                option={option._id}
+                label={option.name}
+                onClick={handleFlagClick}
+                index={index}
+              />
+            ))
+          ) : (
+            <Box
+              p={0.5}
+              display="flex"
+              flexDirection="column"
+              alignItems="center"
+              textAlign="center"
+            >
+              <Typography variant="caption">No Flags Added</Typography>
+              <Typography
+                variant="caption"
+                as={Link}
+                to={`/dashboard/${projectId}`}
+              >
+                Visit Dashboard to Add
+              </Typography>
+            </Box>
+          )}
         </MenuList>
       </Menu>
     </>
