@@ -87,6 +87,8 @@ const reducer = (state, action) => {
       return { ...state, filters: initialState.filters };
     }
     case "UPDATE_TOKEN_VALUE": {
+      // console.log("UPDATE_TOKEN_VALUE", action.payload);
+
       const text = state.texts[action.payload.textId];
       const newTokens = {
         ...text.tokens,
