@@ -1,12 +1,9 @@
-import React from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import "./App.css";
-// import { ProtectedRoute } from "./features/auth/protectedroute";
-// import { Unauthorized } from "./features/auth/unauthorized";
-import Landing from "./features/landing/Landing";
-import Projects from "./features/projects/Projects";
-import CreateProject from "./features/projectcreation/CreateProject";
-import Project from "./features/project/Project";
+import Landing from "./features/Landing";
+import Projects from "./features/Projects";
+import Create from "./features/Create";
+import Project from "./features/Project";
 import Layout from "./shared/components/Layout";
 import Dashboard from "./features/Dashboard";
 import CustomSnackbar from "./shared/components/CustomSnackbar";
@@ -39,7 +36,7 @@ function App() {
                       <Route
                         exact
                         path="/project/create"
-                        element={<CreateProject />}
+                        element={<Create />}
                       />
                       <Route
                         path="/dashboard/:projectId"
