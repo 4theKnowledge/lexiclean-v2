@@ -14,7 +14,11 @@ import { styled } from "@mui/material/styles";
 import { PRIMARY_SIDEBAR_WIDTH } from "../../constants/layout";
 import ThemeToggleButton from "./ThemeToggleButton";
 import { useAppContext } from "../../context/AppContext";
-import { useLocation } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
+import { useContext, useEffect, useState } from "react";
+import { ProjectContext } from "../../context/ProjectContext";
+import useProjectActions from "../../hooks/api/project";
+import useApi from "../../hooks/useApi";
 
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
@@ -45,18 +49,42 @@ const getNotificationTitle = (count) => {
 };
 
 const CustomAppBar = ({ drawerOpen, handleDrawerToggle }) => {
-  const location = useLocation(); // Hook from React Router to get the current location
+  const location = useLocation();
+  const { projectId } = useParams();
   const { state } = useAppContext();
+  const { getProjectName } = useProjectActions();
+  const [currentPageContext, setCurrentPageContext] = useState("Loading...");
   const unreadNotificationsCount = state.notifications.filter(
     (n) => !n.read
   ).length;
-
   const locationSlugs = location.pathname.split("/").filter(Boolean);
-  const currentPageContext =
-    locationSlugs[
-      location.pathname.includes("dashboard") ? 0 : locationSlugs.length - 1
-    ];
-  const breadcrumbs = locationSlugs.join(" / ");
+  const breadcrumbs = "/ " + locationSlugs.join(" / ");
+
+  useEffect(() => {
+    const fetchProjectDetail = async () => {
+      // Assuming the 'dashboard' segment in the URL indicates viewing a specific project
+      if (location.pathname.includes("/dashboard/") && projectId) {
+        try {
+          const name = await getProjectName({ projectId });
+          setCurrentPageContext(name);
+        } catch (error) {
+          console.error("Failed to fetch project name:", error);
+          setCurrentPageContext("Dashboard"); // Fallback text
+        }
+      } else {
+        // Update currentPageContext based on the last segment of the URL or a specific rule
+        setCurrentPageContext(
+          locationSlugs[
+            location.pathname.includes("/dashboard")
+              ? locationSlugs.findIndex((slug) => slug === "dashboard") + 1
+              : locationSlugs.length - 1
+          ]
+        );
+      }
+    };
+
+    fetchProjectDetail();
+  }, [location, projectId]);
 
   return (
     <AppBar
