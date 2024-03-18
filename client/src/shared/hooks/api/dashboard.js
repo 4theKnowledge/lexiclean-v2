@@ -13,12 +13,13 @@ const useDashboardActions = () => {
 
       return data;
     } catch (error) {
-      console.error(`Error fetching project dashboard info: ${error}`);
       snackbarDispatch({
         type: "SHOW",
         message: `Unable to fetch project dashboard information`,
         severity: "error",
       });
+
+      error.message = error.response.data.message;
 
       throw error;
     }
