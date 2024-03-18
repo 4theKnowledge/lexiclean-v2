@@ -3,7 +3,7 @@ import StyledCard from "./StyledCard";
 import FlagEditor from "../../shared/components/FlagEditor";
 import { Alert, AlertTitle, Box } from "@mui/material";
 
-const Flags = ({ loading, data, handleUpdate }) => {
+const Flags = ({ loading, data, handleUpdate, disabled = false }) => {
   if (loading) {
     return <p>Loading...</p>;
   }
@@ -23,6 +23,7 @@ const Flags = ({ loading, data, handleUpdate }) => {
         <FlagEditor
           values={data.details.flags.map((f) => f.name)}
           updateValue={handleUpdate}
+          disabled={disabled}
         />
       </Box>
     </StyledCard>

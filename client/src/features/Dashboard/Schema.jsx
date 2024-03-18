@@ -2,7 +2,7 @@ import StyledCard from "./StyledCard";
 import SchemaEditor from "../../shared/components/SchemeEditor";
 import { Alert, AlertTitle, Box } from "@mui/material";
 
-const Schema = ({ loading, data, handleUpdateSchema }) => {
+const Schema = ({ loading, data, handleUpdateSchema, disabled }) => {
   return (
     <StyledCard title="Schema">
       <Box p="0rem 1rem">
@@ -24,6 +24,7 @@ const Schema = ({ loading, data, handleUpdateSchema }) => {
           }}
           updateValue={handleUpdateSchema}
           disableTextEditor={true}
+          disabled={disabled}
         />
       )}
     </StyledCard>

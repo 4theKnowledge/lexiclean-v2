@@ -2,7 +2,13 @@ import { Box, Button, Grid, Stack, TextField, Typography } from "@mui/material";
 import { useState } from "react";
 import StyledCard from "./StyledCard";
 
-const Settings = ({ loading, data, downloadProject, deleteProject }) => {
+const Settings = ({
+  loading,
+  data,
+  downloadProject,
+  deleteProject,
+  disabled = false,
+}) => {
   const [deleteName, setDeleteName] = useState("");
 
   return (
@@ -51,11 +57,14 @@ const Settings = ({ loading, data, downloadProject, deleteProject }) => {
                 size="small"
                 error
                 fullWidth
+                disabled={disabled}
               />
               <Button
                 variant="contained"
                 onClick={deleteProject}
-                disabled={loading || data.details.name !== deleteName}
+                disabled={
+                  loading || data.details.name !== deleteName || disabled
+                }
                 color="error"
               >
                 Delete
