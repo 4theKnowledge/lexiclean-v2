@@ -15,18 +15,18 @@ import { ModalProvider } from "./shared/context/ModalContext";
 import Account from "./features/Account";
 import AuthPage from "./shared/components/auth/AuthPage";
 import { ProjectProvider } from "./shared/context/ProjectContext";
-import { ErrorBoundaryProvider } from "./shared/context/ErrorBoundaryContext";
+import ErrorBoundary from "./shared/components/ErrorBoundary";
 
 function App() {
   return (
     <ThemeProvider>
-      <SnackbarProvider>
-        <ModalProvider>
-          <AppProvider>
-            <ProjectProvider>
-              <CustomSnackbar />
-              <BrowserRouter>
-                <ErrorBoundaryProvider>
+      <ErrorBoundary>
+        <SnackbarProvider>
+          <ModalProvider>
+            <AppProvider>
+              <ProjectProvider>
+                <CustomSnackbar />
+                <BrowserRouter>
                   <Routes>
                     <Route path="/auth" element={<AuthPage />} />
                     <Route index element={<Landing />} />
@@ -48,12 +48,12 @@ function App() {
                     <Route path="/unauthorized" element={<ErrorPage />} />
                     <Route path="*" element={<ErrorPage />} />
                   </Routes>
-                </ErrorBoundaryProvider>
-              </BrowserRouter>
-            </ProjectProvider>
-          </AppProvider>
-        </ModalProvider>
-      </SnackbarProvider>
+                </BrowserRouter>
+              </ProjectProvider>
+            </AppProvider>
+          </ModalProvider>
+        </SnackbarProvider>
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }
