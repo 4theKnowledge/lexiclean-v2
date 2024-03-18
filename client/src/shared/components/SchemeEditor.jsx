@@ -26,7 +26,12 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import FileUploadIcon from "@mui/icons-material/FileUpload";
 import ArrowCircleRightIcon from "@mui/icons-material/ArrowCircleRight";
 
-const SchemaEditor = ({ values, updateValue, disableTextEditor = false }) => {
+const SchemaEditor = ({
+  values,
+  updateValue,
+  disableTextEditor = false,
+  disabled = false,
+}) => {
   const tagTemplate = {
     name: "",
     description: "",
@@ -125,14 +130,19 @@ const SchemaEditor = ({ values, updateValue, disableTextEditor = false }) => {
           deleteTag={deleteTag}
           selectTag={selectTag}
           selectedTagIndex={selectedTagIndex}
+          disabled={disabled}
         />
       </Grid>
       <Grid item xs={6} p="0rem 0.5rem">
-        <TagCreator currentTag={currentTag} setCurrentTag={setCurrentTag} />
+        <TagCreator
+          currentTag={currentTag}
+          setCurrentTag={setCurrentTag}
+          disabled={disabled}
+        />
         <TagDataEditor
           currentTag={currentTag}
           handleTagValuesChange={handleTagValuesChange}
-          disabled={disableTextEditor}
+          disabled={disableTextEditor || disabled}
         />
 
         {/* // TODO: do not permit tags with the same names being used...
@@ -146,13 +156,20 @@ const SchemaEditor = ({ values, updateValue, disableTextEditor = false }) => {
           disableCreateUpdateBtn={currentTag.name === ""}
           isUpdateContext={selectedTagIndex !== null}
           tagNames={tagNames}
+          disabled={disabled}
         />
       </Grid>
     </Grid>
   );
 };
 
-const TagContainer = ({ tags, deleteTag, selectTag, selectedTagIndex }) => {
+const TagContainer = ({
+  tags,
+  deleteTag,
+  selectTag,
+  selectedTagIndex,
+  disabled = false,
+}) => {
   const hasTags = tags.length !== 0;
   return (
     <Box
@@ -202,6 +219,7 @@ const TagContainer = ({ tags, deleteTag, selectTag, selectedTagIndex }) => {
                   index={index}
                   selectTag={selectTag}
                   deleteTag={deleteTag}
+                  disabled={disabled}
                 />
               </Box>
             ) : (
@@ -210,6 +228,7 @@ const TagContainer = ({ tags, deleteTag, selectTag, selectedTagIndex }) => {
                 index={index}
                 selectTag={selectTag}
                 deleteTag={deleteTag}
+                disabled={disabled}
               />
             );
           })}
@@ -219,14 +238,20 @@ const TagContainer = ({ tags, deleteTag, selectTag, selectedTagIndex }) => {
   );
 };
 
-const TagListItem = ({ tag, index, selectTag, deleteTag }) => {
+const TagListItem = ({
+  tag,
+  index,
+  selectTag,
+  deleteTag,
+  disabled = false,
+}) => {
   return (
     <ListItem
       secondaryAction={
         <IconButton
           aria-label="delete"
           onClick={() => deleteTag(index)}
-          disabled={!tag.deletable}
+          disabled={!tag.deletable || disabled}
           color="error"
         >
           <Tooltip title="Click to delete this label">
@@ -267,7 +292,7 @@ const TagListItem = ({ tag, index, selectTag, deleteTag }) => {
   );
 };
 
-const TagCreator = ({ currentTag, setCurrentTag }) => {
+const TagCreator = ({ currentTag, setCurrentTag, disabled = false }) => {
   return (
     <Box component={Paper} variant="outlined" p={2}>
       <Stack direction="column" spacing={2} alignItems="left">
@@ -276,6 +301,7 @@ const TagCreator = ({ currentTag, setCurrentTag }) => {
             Give your entity label a name (unique):
           </Typography>
           <TextField
+            disabled={disabled}
             InputProps={{
               style: {
                 color: getContrastTextColor(currentTag.color),
@@ -301,6 +327,7 @@ const TagCreator = ({ currentTag, setCurrentTag }) => {
             Give your entity label a description (optional):
           </Typography>
           <TextField
+            disabled={disabled}
             InputProps={{
               style: {
                 color: getContrastTextColor(currentTag.color),
@@ -340,7 +367,11 @@ const TagCreator = ({ currentTag, setCurrentTag }) => {
   );
 };
 
-const TagDataEditor = ({ currentTag, handleTagValuesChange, disabled }) => {
+const TagDataEditor = ({
+  currentTag,
+  handleTagValuesChange,
+  disabled = false,
+}) => {
   return (
     <Box mt={2}>
       <TextField
@@ -393,7 +424,7 @@ const TagCreateUpdateUploadButtons = ({
       <Button
         variant="contained"
         onClick={createUpdateFunction}
-        disabled={disableCreateUpdateBtn}
+        disabled={disableCreateUpdateBtn || disabled}
       >
         {isUpdateContext ? "Update" : "Create"}
       </Button>
