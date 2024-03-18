@@ -12,7 +12,7 @@ import { getReadableString } from "../../shared/utils/dashboard";
 import StyledCard from "./StyledCard";
 import { useEffect, useState } from "react";
 
-const Details = ({ loading, data, handleUpdate }) => {
+const Details = ({ loading, data, handleUpdate, disabled }) => {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isUnchanged, setIsUnchanged] = useState(true);
@@ -41,7 +41,7 @@ const Details = ({ loading, data, handleUpdate }) => {
             alignItems="center"
             justifyContent="space-between"
           >
-            <Box width={120}>
+            <Box width={120} mr={1}>
               <Typography fontWeight="bold" color="text.secondary">
                 Name
               </Typography>
@@ -51,6 +51,8 @@ const Details = ({ loading, data, handleUpdate }) => {
               onChange={(e) => setName(e.target.value)}
               size="small"
               fullWidth
+              disabled={disabled}
+              autoComplete="false"
             />
           </Box>
           <Box
@@ -59,7 +61,7 @@ const Details = ({ loading, data, handleUpdate }) => {
             alignItems="center"
             justifyContent="space-between"
           >
-            <Box width={120}>
+            <Box width={120} mr={1}>
               <Typography fontWeight="bold" color="text.secondary">
                 Description
               </Typography>
@@ -69,6 +71,28 @@ const Details = ({ loading, data, handleUpdate }) => {
               onChange={(e) => setDescription(e.target.value)}
               size="small"
               fullWidth
+              disabled={disabled}
+              autoComplete="false"
+            />
+          </Box>
+          <Box
+            key={"textfield-details-owner"}
+            display="flex"
+            alignItems="center"
+            justifyContent="space-between"
+          >
+            <Box width={120} mr={1}>
+              <Typography fontWeight="bold" color="text.secondary">
+                Project Owner
+              </Typography>
+            </Box>
+            <TextField
+              value={data.details.ownerUsername}
+              placeholder="Project owners username"
+              size="small"
+              fullWidth
+              disabled
+              autoComplete="false"
             />
           </Box>
         </Stack>
@@ -78,7 +102,7 @@ const Details = ({ loading, data, handleUpdate }) => {
           <Button
             variant="contained"
             onClick={() => handleUpdate(name, description)}
-            disabled={isUnchanged}
+            disabled={isUnchanged || disabled}
           >
             Update
           </Button>
@@ -94,7 +118,7 @@ const Details = ({ loading, data, handleUpdate }) => {
               <Chip key={index} label={t} size="small" />
             ))
           ) : (
-            <Typography variant="caption">No special tokend defined</Typography>
+            <Typography variant="caption">No special tokens defined</Typography>
           )}
         </Stack>
       </Box>
