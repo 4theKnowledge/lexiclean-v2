@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 
-const FlagEditor = ({ values, updateValue }) => {
+const FlagEditor = ({ values, updateValue, disabled = false }) => {
   const [input, setInput] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editingIndex, setEditingIndex] = useState(-1);
@@ -73,17 +73,25 @@ const FlagEditor = ({ values, updateValue }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addOrUpdateFlag()}
+            disabled={disabled}
           />
           <Button
             variant="contained"
             onClick={addOrUpdateFlag}
             size="small"
-            disabled={input.trim() === "" || values.includes(input.trim())}
+            disabled={
+              input.trim() === "" || values.includes(input.trim()) || disabled
+            }
           >
             {isEditing ? "Update" : "Add"}
           </Button>
           {isEditing && (
-            <Button variant="outlined" onClick={resetForm} size="small">
+            <Button
+              variant="outlined"
+              onClick={resetForm}
+              size="small"
+              disabled={disabled}
+            >
               Cancel
             </Button>
           )}
@@ -109,7 +117,7 @@ const FlagEditor = ({ values, updateValue }) => {
                   key={index}
                   label={flag}
                   onClick={() => handleFlagClick(flag, index)}
-                  onDelete={() => removeFlag(flag)}
+                  onDelete={() => (disabled ? {} : removeFlag(flag))}
                   deletable
                   color={index === editingIndex ? "primary" : "default"}
                   variant={
