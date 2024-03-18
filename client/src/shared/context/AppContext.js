@@ -41,10 +41,43 @@ export function AppProvider({ children }) {
     getAccessTokenSilently,
   } = useAuth0();
 
+  // useEffect(() => {
+  //   if (isAuthenticated && auth0User) {
+  //     // Fetch additional user data based on Auth0 user information
+  //     async function fetchUserData() {
+  //       try {
+  //         const auth0Token = await getAccessTokenSilently({
+  //           authorizationParams: {
+  //             audience: `https://${process.env.REACT_APP_AUTH0_AUDIENCE}`,
+  //           },
+  //         });
+  //         dispatch({ type: "SET_TOKEN", payload: auth0Token });
+
+  //         const response = await axiosInstance.get("/api/user/", {
+  //           headers: {
+  //             Authorization: `Bearer ${auth0Token}`,
+  //           },
+  //         });
+
+  //         if (response.status !== 200) {
+  //           throw new Error("Failed to fetch user data");
+  //         }
+  //         const userData = await response.data;
+  //         dispatch({ type: "SET_USER", payload: userData });
+  //       } catch (error) {
+  //         console.error("Error fetching user data:", error);
+  //       }
+  //     }
+  //     fetchUserData();
+  //   } else {
+  //     // Handle logout
+  //     dispatch({ type: "LOGOUT_USER" });
+  //   }
+  // }, [isAuthenticated, auth0User]); // Depend on Auth0's authentication state.
+
   useEffect(() => {
     if (isAuthenticated && auth0User) {
-      // Fetch additional user data based on Auth0 user information
-      async function fetchUserData() {
+      const initializeApp = async () => {
         try {
           const auth0Token = await getAccessTokenSilently({
             authorizationParams: {
@@ -53,27 +86,74 @@ export function AppProvider({ children }) {
           });
           dispatch({ type: "SET_TOKEN", payload: auth0Token });
 
-          const response = await axiosInstance.get("/api/user/", {
+          const [userDataResponse, notificationsResponse] = await Promise.all([
+            axiosInstance.get("/api/user/", {
+              headers: {
+                Authorization: `Bearer ${auth0Token}`,
+              },
+            }),
+            axiosInstance.get("/api/notification", {
+              headers: {
+                Authorization: `Bearer ${auth0Token}`,
+              },
+            }),
+          ]);
+
+          if (userDataResponse.status === 200) {
+            dispatch({ type: "SET_USER", payload: userDataResponse.data });
+          } else {
+            throw new Error("Failed to fetch user data");
+          }
+
+          if (notificationsResponse.status === 200) {
+            dispatch({
+              type: "SET_NOTIFICATIONS",
+              payload: notificationsResponse.data,
+            });
+          } else {
+            throw new Error("Failed to fetch notifications");
+          }
+        } catch (error) {
+          console.error("Initialization error:", error);
+        }
+      };
+      initializeApp();
+    } else {
+      console.log("logging out..."); // TODO review why this is happening.
+      dispatch({ type: "LOGOUT_USER" });
+    }
+  }, [isAuthenticated, auth0User]);
+
+  useEffect(() => {
+    let pollingInterval = null;
+    if (state.token) {
+      // Start polling for notifications
+      const fetchNotifications = async () => {
+        try {
+          const response = await axiosInstance.get("/api/notification", {
             headers: {
-              Authorization: `Bearer ${auth0Token}`,
+              Authorization: `Bearer ${state.token}`,
             },
           });
 
-          if (response.status !== 200) {
-            throw new Error("Failed to fetch user data");
+          if (response.status === 200) {
+            dispatch({ type: "SET_NOTIFICATIONS", payload: response.data });
           }
-          const userData = await response.data;
-          dispatch({ type: "SET_USER", payload: userData });
         } catch (error) {
-          console.error("Error fetching user data:", error);
+          console.error("Error fetching notifications:", error);
         }
-      }
-      fetchUserData();
-    } else {
-      // Handle logout
-      dispatch({ type: "LOGOUT_USER" });
+      };
+
+      fetchNotifications(); // Initial fetch
+
+      const pollingRate = 5 * 60 * 1000; // 5 minutes
+      pollingInterval = setInterval(fetchNotifications, pollingRate);
     }
-  }, [isAuthenticated, auth0User]); // Depend on Auth0's authentication state.
+
+    return () => {
+      if (pollingInterval) clearInterval(pollingInterval);
+    };
+  }, [state.token]);
 
   // Value to be passed to the provider
   const value = { state, dispatch };
