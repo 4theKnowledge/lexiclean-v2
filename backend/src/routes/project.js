@@ -21,6 +21,7 @@ import {
 } from "../middleware/auth.js";
 import { textTokenSearchPipeline } from "../aggregations/token.js";
 import { annotationsWithTokenDataPipeline } from "../aggregations/annotation.js";
+import Notifications from "../models/Notifications.js";
 
 const router = express.Router();
 const REPLACEMENT_COLOR = "#03a9f4";
@@ -129,6 +130,7 @@ router.post("/create", async (req, res) => {
       name: projectName,
       description: projectDescription,
       parallelCorpus: isParallelCorpusProject,
+      annotators: [userId],
       // settings: {}, // TODO: with preannotation settings.
       preprocessing: {
         removeLowerCase: isParallelCorpusProject ? false : preprocessLowerCase,
@@ -395,7 +397,15 @@ router.get("/", async (req, res) => {
     logger.info("Fetching all projects", { route: "/api/project/" });
     const userId = req.userId;
     // TODO: update to check if userId in owner or annotators.
-    const projects = await Project.find({ owner: userId }, { texts: 0 }).lean();
+    const projects = await Project.find(
+      {
+        $or: [
+          { owner: userId }, // Checks if the owner is userId
+          { annotators: userId }, // Checks if userId is in the annotators array
+        ],
+      },
+      { texts: 0 }
+    ).lean();
 
     res.json(projects);
   } catch (error) {
@@ -410,7 +420,12 @@ router.get("/feed", async (req, res) => {
 
   try {
     const userId = req.userId;
-    const projects = await Project.find({ user: userId }).lean();
+    const projects = await Project.find({
+      $or: [
+        { owner: userId }, // Checks if the owner is userId
+        { annotators: userId }, // Checks if userId is in the annotators array
+      ],
+    }).lean();
 
     const output = await Promise.all(
       projects.map(async (project) => {
@@ -504,9 +519,6 @@ router.get("/:projectId", projectAccessCheck, async (req, res) => {
   }
 });
 
-/**
- * TODO: Handle multi-user scenario.
- */
 router.delete("/:projectId", projectManagementCheck, async (req, res) => {
   logger.info("Deleting project", { route: "/api/project/" });
   try {
@@ -527,6 +539,7 @@ router.delete("/:projectId", projectManagementCheck, async (req, res) => {
       _id: { $in: project.maps },
       type: { $ne: "en" },
     });
+    await Notifications.deleteMany({ projectId: projectId });
 
     res.json("Successfully deleted project.");
   } catch (error) {
@@ -706,10 +719,17 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
 
     const [project] = await Project.find({
       _id: projectId,
-    }).lean();
+    })
+      .populate("annotators")
+      .lean();
+
+    // Check if user is owner of project
+    const isOwner = project.owner.toString() === userId.toString();
 
     // Get user details - TODO: extend for all users on the project
-    const users = await User.find({ _id: { $in: [userId] } });
+    const users = await User.find({
+      _id: { $in: [userId, ...project.annotators.map((a) => a._id)] },
+    });
 
     const userDetails = users.reduce((acc, user) => {
       acc[user._id] = user.username;
@@ -739,7 +759,8 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
     let usedByCount = {};
     for (const replacement of populatedReplacements) {
       const replacementKey = `${replacement.originalValue}->${replacement.currentValue}`;
-      const userIdKey = userDetails[replacement.userId] || replacement.userId;
+      console.log("REPLACEMENT", replacement);
+      const userIdKey = userDetails[replacement.userId.toString()];
 
       // Initialize or update the count for the user
       if (!usedByCount[replacementKey]) {
@@ -832,7 +853,51 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
 
     const correctionsMade = replacementTokenIds.length;
 
+    // Get users that have been invited to the project.
+
+    const notifications = await Notifications.find({ projectId })
+      .populate("receiverId")
+      .lean();
+
+    const projectAnnotatorIds = project.annotators.map((a) => a._id.toString());
+
+    const invitedUsers = notifications
+      .filter((n) => !projectAnnotatorIds.includes(n.receiverId._id.toString()))
+      .map((n) => ({ username: n.receiverId.username, status: n.status }));
+
+    const projectAnnotators = [
+      ...project.annotators.map((a) => ({
+        username: a.username,
+        status: "accepted",
+      })),
+      ...invitedUsers,
+    ];
+
+    // adjudication... sends the first 50 documents - TODO: add dedicated route to "show more".
+
+    const adjudicatedTexts = [
+      {
+        input: ["hell", "Xorld"],
+        annotations: {
+          user1: {
+            labels: { 0: "Cat" },
+            tokens: ["hello", "world"],
+            flags: ["unsure"],
+          },
+          user2: {
+            labels: { 0: "Cat", 1: "Dog" },
+            tokens: ["Hello", "world"],
+            flags: [],
+          },
+        },
+        compiled: { tokens: ["hello", "world"], labels: { 0: "Cat" } },
+      },
+    ];
+
+    // const adjudicatedTexts = project.texts.slice(0, 50);
+
     res.json({
+      isOwner,
       details: {
         _id: req.params.projectId,
         name: project.name,
@@ -843,6 +908,8 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
         preprocessing: project.preprocessing,
         tags: project.tags,
         flags: project.flags,
+        ownerUsername: userDetails[project.owner],
+        annotators: projectAnnotators,
       },
       metrics: [
         {
@@ -923,6 +990,7 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
       ],
       lists: {
         replacementHistory,
+        adjudicatedTexts,
       },
     });
   } catch (error) {
