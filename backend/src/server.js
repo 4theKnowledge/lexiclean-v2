@@ -11,6 +11,7 @@ import textRoute from "./routes/text.js";
 import tokenRoute from "./routes/token.js";
 import schemaRoute from "./routes/schema.js";
 import userRoute from "./routes/user.js";
+import notificationRoute from "./routes/notification.js";
 
 import { authenticateUser, projectAccessCheck } from "./middleware/auth.js";
 
@@ -41,6 +42,7 @@ app.use("/api/schema", projectAccessCheck, schemaRoute);
 
 // User route might not require project access check
 app.use("/api/user", userRoute);
+app.use("/api/notification", notificationRoute);
 
 // Simple health check
 app.get("/health", (req, res) => {
