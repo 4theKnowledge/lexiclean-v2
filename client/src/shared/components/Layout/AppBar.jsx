@@ -19,6 +19,7 @@ import { useContext, useEffect, useState } from "react";
 import { ProjectContext } from "../../context/ProjectContext";
 import useProjectActions from "../../hooks/api/project";
 import useApi from "../../hooks/useApi";
+import NotificationsBell from "./NotificationsBell";
 
 const AppBar = styled(MuiAppBar, {
   shouldForwardProp: (prop) => prop !== "open",
@@ -128,13 +129,14 @@ const CustomAppBar = ({ drawerOpen, handleDrawerToggle }) => {
           <Typography fontSize={10}>{breadcrumbs}</Typography>
         </Stack>
         <Stack direction="row" spacing={2} alignItems="center">
-          <IconButton color="inherit">
+          <NotificationsBell notifications={state.notifications} />
+          {/* <IconButton color="inherit">
             <Tooltip title={getNotificationTitle(unreadNotificationsCount)}>
               <Badge badgeContent={unreadNotificationsCount} color="primary">
                 <NotificationsIcon />
               </Badge>
             </Tooltip>
-          </IconButton>
+          </IconButton> */}
           <ThemeToggleButton />
         </Stack>
       </Toolbar>
