@@ -21,6 +21,7 @@ import useDashboardActions from "../../shared/hooks/api/dashboard";
 import LoadingButton from "@mui/lab/LoadingButton";
 import Flags from "./Flags";
 import Replacements from "./Replacements";
+import Adjudication from "./Adjudication";
 
 const Dashboard = () => {
   const { projectId } = useParams();
@@ -28,6 +29,7 @@ const Dashboard = () => {
   const [data, setData] = useState();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [disabled, setDisabled] = useState(true);
   const { dispatch: snackbarDispatch } = useSnackbar();
   const {
     fetchProjectSummaryById,
@@ -43,6 +45,7 @@ const Dashboard = () => {
       try {
         const projectData = await fetchProjectSummaryById(projectId);
         setData(projectData);
+        setDisabled(!projectData.isOwner);
       } catch (error) {
         setError(error);
       } finally {
@@ -176,6 +179,7 @@ const Dashboard = () => {
             loading={loading}
             data={data}
             handleUpdate={handleUpdateDetails}
+            disabled={disabled}
           />
         </Grid>
         <Grid item xs={12}>
@@ -186,6 +190,7 @@ const Dashboard = () => {
             loading={loading}
             data={data}
             handleUpdate={handleUpdateAnnotators}
+            disabled={disabled}
           />
         </Grid>
         <Grid item xs={12}>
@@ -193,6 +198,7 @@ const Dashboard = () => {
             loading={loading}
             data={data}
             handleUpdateSchema={handleUpdateSchema}
+            disabled={disabled}
           />
         </Grid>
         <Grid item xs={12}>
@@ -200,7 +206,11 @@ const Dashboard = () => {
             loading={loading}
             data={data}
             handleUpdate={handleUpdateFlags}
+            disabled={disabled}
           />
+        </Grid>
+        <Grid item xs={12}>
+          <Adjudication loading={loading} data={data.lists.adjudicationTexts} />
         </Grid>
         <Grid item xs={12}>
           <Settings
@@ -208,6 +218,7 @@ const Dashboard = () => {
             data={data}
             downloadProject={downloadProject}
             deleteProject={deleteProject}
+            disabled={disabled}
           />
         </Grid>
       </Grid>
