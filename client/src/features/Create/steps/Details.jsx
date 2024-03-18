@@ -21,20 +21,11 @@ const Details = ({ values, updateValue }) => {
         caption="Describe your project to provide context for annotators. You can edit this description at any time."
         placeholder="Enter a brief description"
       />
-      <CustomTextField
-        value={values.specialTokens}
-        setValueFunction={(targetValue) =>
-          updateValue("specialTokens", targetValue)
-        }
-        title="Are there any special tokens in your project?"
-        caption="Enter your special tokens separated by commas (e.g., <id>, <sensitive>). These tokens will be recognised as part of the vocabulary when your project is created."
-        placeholder="Enter special tokens here (e.g., <id>, <sensitive>)"
-      />
     </Stack>
   );
 };
 
-const CustomTextField = ({
+export const CustomTextField = ({
   value,
   setValueFunction,
   title,
