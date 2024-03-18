@@ -1,27 +1,14 @@
 import express from "express";
 import { jwtDecode } from "jwt-decode";
-import logger from "../logger/index.js";
 import User from "../models/User.js";
 
 const router = express.Router();
 
 router.get("/", async (req, res) => {
-  const user = jwtDecode(req.headers.authorization.replace("Bearer ", ""));
-
+  console.log("fetching user details");
   try {
-    // Check if user exists in db
-    const userResponse = await User.findOne({ auth0Id: user.sub }).lean();
-
-    if (!userResponse) {
-      // Create user and return
-      newUser = new User({
-        username: user.nickname,
-        email: user.email,
-        name: user.nickname,
-        auth0Id: user.sub,
-      });
-      await newUser.save();
-    }
+    const userId = req.userId;
+    const userResponse = await User.findById({ _id: userId }).lean();
     res.json(userResponse);
   } catch (error) {
     console.error("Error accessing user data:", error);
@@ -29,12 +16,12 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.get("/system", async (req, res) => {
-  // Fetch system user which is used in the single annotator application variant.
-  // TODO: Review this when the system's build config is put together.
-  const user = await User.findOne({ username: "system" }).lean();
-  res.json(user);
-});
+// router.get("/system", async (req, res) => {
+//   // Fetch system user which is used in the single annotator application variant.
+//   // TODO: Review this when the system's build config is put together.
+//   const user = await User.findOne({ username: "system" }).lean();
+//   res.json(user);
+// });
 
 router.patch("/:userId", async (req, res) => {
   try {
