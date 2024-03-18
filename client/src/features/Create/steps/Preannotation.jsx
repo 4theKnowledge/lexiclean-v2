@@ -6,10 +6,21 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { CustomTextField } from "./Details";
 
 const Preannotation = ({ values, updateValue }) => {
   return (
     <Stack direction="column" spacing={2}>
+      <CustomTextField
+        value={values.specialTokens}
+        setValueFunction={(targetValue) =>
+          updateValue("specialTokens", targetValue)
+        }
+        title="Are there any special tokens in your project?"
+        caption="Enter your special tokens separated by commas (e.g., <id>, <sensitive>). These tokens will be recognised as part of the vocabulary when your project is created."
+        placeholder="Enter special tokens here (e.g., <id>, <sensitive>)"
+      />
+
       <CustomCheckboxField
         title="Apply Replacement Dictionary Automatically?"
         caption="Enable this to auto-apply replacements to your corpus for faster annotation. You can revert these changes anytime."
