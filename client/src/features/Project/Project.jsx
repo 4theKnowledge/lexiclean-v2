@@ -1,5 +1,5 @@
 import { useState, useEffect, useContext } from "react";
-import { useLocation, useParams, useNavigate } from "react-router-dom";
+import { useLocation, useParams } from "react-router-dom";
 import { Box, CssBaseline, Container } from "@mui/material";
 import { ProjectContext } from "../../shared/context/ProjectContext";
 import Sidebar from "./sidebar/Sidebar";
@@ -9,45 +9,38 @@ import ProjectAppBar from "./AppBar";
 import useProjectActions from "../../shared/hooks/api/project";
 
 const Project = () => {
-  const navigate = useNavigate();
   const { projectId } = useParams();
   const [state, dispatch] = useContext(ProjectContext);
   const { getProjectProgress, getProject, getTexts } = useProjectActions();
   const [loading, setLoading] = useState(true);
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
-  const [page, setPage] = useState(searchParams.get("page") || "1");
+  const pageFromUrl = searchParams.get("page") || "1";
+  const [page, setPage] = useState(pageFromUrl);
 
   useEffect(() => {
-    // Load project
-    const initProject = async () => {
-      if (loading) {
-        await getProjectProgress({ projectId });
-        await getProject({ projectId });
-        await getTexts({
-          projectId,
-          filters: state.filters,
-          page: page,
-          limit: state.pageLimit,
-        });
-        setLoading(false);
-      }
-    };
-
-    initProject();
-  }, [projectId]);
-
-  useEffect(() => {
-    // If projectId changes, reload data.
-    setLoading(false);
-  }, [projectId, state.pageLimit]);
-
-  useEffect(() => {
-    // Check if 'page' parameter is not present or is explicitly the empty string
-    if (!searchParams.has("page") || searchParams.get("page") === "") {
-      navigate(`/project/${projectId}?page=${page}`, { replace: true });
+    if (page !== pageFromUrl) {
+      setPage(pageFromUrl);
     }
-  }, [projectId, navigate, page]);
+  }, [location.search]); // Depend on search string from location object
+
+  const loadData = async () => {
+    console.log("loading project data...");
+    await getProjectProgress({ projectId });
+    await getProject({ projectId });
+    await getTexts({
+      projectId,
+      filters: state.filters,
+      page,
+      limit: state.pageLimit,
+    });
+  };
+
+  // Load or refresh data when projectId or page changes
+  useEffect(() => {
+    setLoading(true); // Set loading to true to indicate loading state
+    loadData().then(() => setLoading(false)); // Load data and then set loading to false
+  }, [projectId, page, state.filters, state.pageLimit]);
 
   useEffect(() => {
     dispatch({ type: "SET_PAGE", payload: page });
