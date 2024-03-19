@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 import mongoose from "mongoose";
 import { auth } from "express-oauth2-jwt-bearer";
+import { rateLimit } from "express-rate-limit";
 
 import projectRoute from "./routes/project.js";
 import textRoute from "./routes/text.js";
@@ -12,15 +13,29 @@ import tokenRoute from "./routes/token.js";
 import schemaRoute from "./routes/schema.js";
 import userRoute from "./routes/user.js";
 import notificationRoute from "./routes/notification.js";
-
 import { authenticateUser, projectAccessCheck } from "./middleware/auth.js";
 
 const app = express();
 
-const checkJwt = auth({
-  audience: `https://${process.env.AUTH0_AUDIENCE}`,
-  issuerBaseURL: `https://${process.env.AUTH0_DOMAIN}`,
+// Create rate limit rule
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
+
+// Apply the rate limiting middleware to all requests
+app.use(apiLimiter);
+
+if (process.env.AUTH_STRATEGY === "AUTH0") {
+  const checkJwt = auth({
+    audience: `https://${process.env.AUTH0_AUDIENCE}`,
+    issuerBaseURL: `https://${process.env.AUTH0_DOMAIN}`,
+  });
+  // Applying JWT check globally
+  app.use(checkJwt);
+}
 
 // Middleware
 app.use(cors());
@@ -28,11 +43,13 @@ app.use(express.urlencoded({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json({ limit: "50mb" }));
 
+// Simple health check
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
 // Custom middleware
 app.use(authenticateUser);
-
-// Applying JWT check globally
-app.use(checkJwt);
 
 // Applying project access check to routes that need it
 app.use("/api/project", projectRoute);
@@ -43,11 +60,6 @@ app.use("/api/schema", projectAccessCheck, schemaRoute);
 // User route might not require project access check
 app.use("/api/user", userRoute);
 app.use("/api/notification", notificationRoute);
-
-// Simple health check
-app.get("/health", (req, res) => {
-  res.status(200).send("OK");
-});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -69,3 +81,5 @@ mongoose
 // Create listener
 const port = process.env.PORT || 3001;
 app.listen(port, () => console.log(`[server] Started on port ${port}`));
+
+console.log(`Running in ${process.env.AUTH_STRATEGY} mode`);
