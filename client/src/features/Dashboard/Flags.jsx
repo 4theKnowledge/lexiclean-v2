@@ -21,8 +21,9 @@ const Flags = ({ loading, data, handleUpdate, disabled = false }) => {
       </Box>
       <Box p={2}>
         <FlagEditor
-          values={data.details.flags.map((f) => f.name)}
+          values={data.details.flags}
           updateValue={handleUpdate}
+          isDashboard={true}
           disabled={disabled}
         />
       </Box>
