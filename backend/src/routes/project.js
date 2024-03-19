@@ -30,7 +30,6 @@ router.post("/create", async (req, res) => {
   logger.info("Creating project", { route: "/api/project/create" });
   try {
     const userId = req.userId;
-    console.log("userId: ", userId);
 
     const {
       projectName,
@@ -147,7 +146,7 @@ router.post("/create", async (req, res) => {
         color: t.color,
       })), // This is the schema for entity-label tagging.
       flags: flags.map((f) => ({
-        name: f,
+        name: f.name,
       })), // These will be given an _id when the project is populated.
     });
 
@@ -427,29 +426,56 @@ router.get("/feed", async (req, res) => {
       ],
     }).lean();
 
+    // Function to count texts with saves over a given number
+    function countTextsWithSavesOver(annotations, saveThreshold) {
+      const saveCounts = new Map();
+
+      annotations.forEach(({ textId, type }) => {
+        saveCounts.set(textId, (saveCounts.get(textId) || 0) + 1);
+      });
+
+      let textsOverThreshold = 0;
+      for (let count of saveCounts.values()) {
+        if (count > saveThreshold) textsOverThreshold++;
+      }
+
+      return textsOverThreshold;
+    }
+
     const output = await Promise.all(
       projects.map(async (project) => {
-        const savedTexts = await Annotations.count({
-          userId,
+        const annotations = await Annotations.find({
           textId: { $in: project.texts },
           type: "save",
         });
+
+        const numAnnotators = project.annotators.length;
+        const numTexts = project.texts.length;
+
+        // Get users progress
+        const userSaveCount = annotations.filter(
+          (a) => a.userId.toString() === userId.toString()
+        ).length;
+
+        const userProgress = (userSaveCount / numTexts) * 100;
+
+        // Get projects progress - all users have saved the doc.
+        const projectSaveCount = countTextsWithSavesOver(
+          annotations,
+          numAnnotators
+        );
+        const progress = (projectSaveCount / numTexts) * 100;
 
         return {
           _id: project._id,
           isParallelCorpusProject: project.parallelCorpus,
           name: project.name,
           description: project.description,
-          startCandidateVocabSize: project.metrics.startCandidateVocabSize,
-          startVocabSize: project.metrics.startVocabSize,
-          startTokenCount: project.startTokenCount,
-          textCount: project.texts.length,
-          savedCount: savedTexts,
-          vocabReduction: 0,
-          // ((project.metrics.startVocabSize - uniqueTokens) /
-          //   project.metrics.startVocabSize) *
-          // 100,
-          oovCorrections: 0, //currentOOVTokens,
+          progress,
+          textCount: numTexts,
+          saveCount: 0,
+          userSaveCount,
+          userProgress,
           createdAt: project.createdAt,
         };
       })
@@ -660,18 +686,11 @@ router.get("/metrics/:projectId", projectAccessCheck, async (req, res) => {
   }
 });
 
-/**
- * TODO: Adapt output to accommodate token classification format - see:
- * LexiClean v1 route https://github.com/nlp-tlp/lexiclean/blob/main/server/routes/project/download.js
- *
- * Currently limited to a single users own annotations.
- */
 router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
   logger.info("Downloading project results", {
     route: "/api/project/download/:projectId",
   });
   try {
-    const userId = req.userId;
     const { projectId } = req.params;
 
     const project = await Project.findById(
@@ -679,25 +698,205 @@ router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
         _id: projectId,
       },
       { _id: 0, owner: 0, maps: 0, __v: 0, updatedAt: 0 }
-    ).lean();
+    )
+      .populate("annotators")
+      .lean();
 
     const textIds = project.texts;
-    console.log("textIds: ", textIds);
-
     delete project.texts;
 
+    const annotators = project.annotators;
+    const annotatorIds = annotators.map((a) => a._id.toString());
+    const annotatorIdToUsername = Object.assign(
+      {},
+      ...annotators.map((a) => ({
+        [a._id.toString()]: a.username,
+      }))
+    );
+
+    const flagIdToName = Object.assign(
+      {},
+      ...project.flags.map((f) => ({
+        [f._id.toString()]: f.name,
+      }))
+    );
+    const tagIdToName = Object.assign(
+      {},
+      ...project.tags.map((t) => ({
+        [t._id.toString()]: t.name,
+      }))
+    );
+
+    const texts = await Text.find({ _id: { $in: textIds } }).lean();
+
     const annotations = await Annotations.find({
-      userId,
       textId: { $in: textIds },
     }).lean();
 
-    res.json({
-      metadata: { ...project, totalTexts: textIds.length },
-      annotations,
-      // texts: formatOutputTexts(texts),
-      // resources: {},
-      // replacements: getReplacementFrequencies(texts),
+    // Separate tokenAnnotations and textAnnotations programmatically
+    const tokenAnnotations = annotations.filter((ann) => ann.tokenId);
+    const textAnnotations = annotations.filter((ann) => !ann.tokenId);
+
+    // Convert annotations into {annotatorId: {textId: {tokenId: [annotations]}}} format
+    const tokenAnnotationsAggregated = tokenAnnotations.reduce(
+      (acc, annotation) => {
+        const userIdStr = annotation.userId.toString();
+        const username = annotatorIdToUsername[userIdStr];
+        const textIdStr = annotation.textId.toString();
+        const tokenIdStr = annotation.tokenId.toString();
+
+        // Initialize annotatorId level if it doesn't exist
+        if (!acc[username]) {
+          acc[username] = {};
+        }
+
+        // Initialize textId level if it doesn't exist
+        if (!acc[username][textIdStr]) {
+          acc[username][textIdStr] = {};
+        }
+
+        // Initialize tokenId level if it doesn't exist, with an empty array to push annotations into
+        if (!acc[username][textIdStr][tokenIdStr]) {
+          acc[username][textIdStr][tokenIdStr] = {
+            tag: [],
+            replacement: null,
+          };
+        }
+
+        // Push the current annotation into the correct place in the structure
+        if (annotation.type === "tag") {
+          acc[username][textIdStr][tokenIdStr][annotation.type].push(
+            tagIdToName[annotation.value.toString()]
+          );
+        }
+        if (annotation.type === "replacement" && !annotation.isSuggestion) {
+          acc[username][textIdStr][tokenIdStr][annotation.type] =
+            annotation.value;
+        }
+
+        return acc;
+      },
+      {}
+    );
+
+    const textAnnotationsAggregated = textAnnotations.reduce(
+      (acc, annotation) => {
+        const userIdStr = annotation.userId.toString();
+        const username = annotatorIdToUsername[userIdStr];
+        const textIdStr = annotation.textId.toString();
+
+        // Initialize annotatorId level if it doesn't exist
+        if (!acc[username]) {
+          acc[username] = {};
+        }
+
+        // Initialize textId level if it doesn't exist
+        if (!acc[username][textIdStr]) {
+          acc[username][textIdStr] = { flag: [], save: false };
+        }
+
+        // Push the current annotation into the correct place in the structure
+        if (annotation.type === "save") {
+          acc[username][textIdStr][annotation.type] = true;
+        }
+        if (annotation.type === "flag") {
+          acc[username][textIdStr][annotation.type].push(
+            flagIdToName[annotation.value.toString()]
+          );
+        }
+
+        return acc;
+      },
+      {}
+    );
+
+    const outputAnnotations = texts.map((text) => {
+      const textIdStr = text._id.toString();
+
+      let tags = {};
+      let replacements = {};
+      let flags = {};
+      let saves = {};
+
+      // Iterate over annotator ids
+      for (const annotatorId of annotatorIds) {
+        const annotatorIdStr = annotatorId.toString();
+        const username = annotatorIdToUsername[annotatorIdStr];
+
+        // Initialize tags and replacements arrays for each annotator if they don't exist
+        tags[username] = tags[username] || [];
+        replacements[username] = replacements[username] || [];
+        flags[username] = flags[username] || [];
+        saves[username] = saves[username] || [];
+
+        // Iterate over tokens
+        for (const token of text.tokens) {
+          const tokenIdStr = token._id.toString();
+          const tokenAnnotations =
+            tokenAnnotationsAggregated[username]?.[textIdStr]?.[tokenIdStr];
+
+          const annotatorReplacement =
+            tokenAnnotations?.replacement ?? token.value;
+          replacements[username].push(annotatorReplacement);
+
+          // Handle tag
+          const annotatorTag = tokenAnnotations?.tag ?? [];
+          // console.log("annotatorTag: ", annotatorTag);
+          if (annotatorTag.length > 0) {
+            tags[username].push(annotatorTag); // Spread to merge arrays
+          } else {
+            // If no tags for this token, push an empty array to maintain structure
+            tags[username].push([]);
+          }
+        }
+
+        // Text-level annotations: Check if username exists for text-level flags
+        if (
+          textAnnotationsAggregated[username] &&
+          textAnnotationsAggregated[username][textIdStr].flag
+        ) {
+          flags[username] = textAnnotationsAggregated[username][textIdStr].flag;
+        } else {
+          // If no text-level annotations exist for this annotator, ensure the structure is maintained
+          flags[username] = [];
+        }
+
+        if (
+          textAnnotationsAggregated[username] &&
+          textAnnotationsAggregated[username][textIdStr].save
+        ) {
+          saves[username] = textAnnotationsAggregated[username][textIdStr].save;
+        } else {
+          // If no text-level annotations exist for this annotator, ensure the structure is maintained
+          saves[username] = false;
+        }
+      }
+
+      return {
+        id: text._id,
+        identifiers: text.identifiers,
+        source: text.original,
+        sourceTokens: text.original.split(" "),
+        reference: text?.reference ?? "",
+        tags,
+        replacements,
+        flags,
+        saves,
+      };
     });
+
+    const payload = {
+      metadata: {
+        ...project,
+        annotators: project.annotators.map((a) => a.username),
+        totalTexts: textIds.length,
+      },
+      annotations: outputAnnotations,
+      tokenAnnotationsAggregated,
+      textAnnotationsAggregated,
+    };
+
+    res.json(payload);
   } catch (error) {
     console.log(`Error: ${error}`);
     res.json({ details: error });
@@ -863,12 +1062,17 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
 
     const invitedUsers = notifications
       .filter((n) => !projectAnnotatorIds.includes(n.receiverId._id.toString()))
-      .map((n) => ({ username: n.receiverId.username, status: n.status }));
+      .map((n) => ({
+        username: n.receiverId.username,
+        status: n.status,
+        _id: n.receiverId._id,
+      }));
 
     const projectAnnotators = [
       ...project.annotators.map((a) => ({
         username: a.username,
         status: "accepted",
+        _id: a._id,
       })),
       ...invitedUsers,
     ];
@@ -1011,52 +1215,90 @@ router.patch("/:projectId/flags", projectManagementCheck, async (req, res) => {
 
   try {
     const { projectId } = req.params;
-    const { flags } = req.body;
-
-    // Separate incoming flags into categories: new, updated, and to determine removed
-    const newFlags = flags
-      .filter((flag) => typeof flag === "string")
-      .map((name) => ({ name }));
-    const updatedFlags = flags.filter(
-      (flag) => typeof flag === "object" && flag._id
-    );
+    const { flags, isDelete } = req.body; //flags: [{name: '', _id: ''}, ...]
 
     // Retrieve the current project to get existing flags
     const project = await Project.findById(projectId, { flags: 1 });
     if (!project) return res.status(404).send("Project not found");
 
-    // Determine which existing flags were not mentioned in the update and hence are to be removed
-    const removedFlagIds = project.flags
-      .filter(
-        (oldFlag) =>
-          !updatedFlags.some(
-            (newFlag) =>
-              newFlag._id && newFlag._id.toString() === oldFlag._id.toString()
-          )
-      )
-      .map((flag) => flag._id);
+    if (isDelete) {
+      // Flags to be deleted and associated annotations.
+      // when isDelete is true, flags is just an array of one flag element.
 
-    // Prepare the flags for database update: combine updated flags with new flags
-    const flagsToUpdate = [...updatedFlags, ...newFlags];
+      const [flag] = flags;
+      const flagId = mongoose.Types.ObjectId(flag._id); // Ensure correct type for _id
 
-    // Update the project with combined updated and new flags, removing the old ones and return the updated document
-    const updatedProject = await Project.findByIdAndUpdate(
-      projectId,
-      { $set: { flags: flagsToUpdate } },
-      { new: true, fields: { flags: 1 } } // Return the updated document with only flags field
-    );
+      // Remove flag from project
+      const updatedProject = await Project.findByIdAndUpdate(
+        projectId,
+        { $pull: { flags: { _id: flagId } } },
+        { new: true, fields: { flags: 1 } }
+      );
+      // Delete annotations for removed flags
+      await Annotations.deleteMany({ value: flagId });
 
-    if (!updatedProject) return res.status(404).send("Project not found");
+      res.json(updatedProject ? updatedProject.flags : []);
+    } else {
+      // Create/update
+      let flagsToUpdate = project.flags; // Assuming this is an array
 
-    if (removedFlagIds.length > 0) {
-      await Annotations.deleteMany({ value: { $in: removedFlagIds } });
+      // Process each incoming flag
+      flags.forEach((flag) => {
+        const flagIndex = flagsToUpdate.findIndex(
+          (f) => f._id.toString() === flag._id
+        );
+
+        if (flagIndex > -1) {
+          // Update existing flag
+          flagsToUpdate[flagIndex].name = flag.name;
+        } else {
+          // Add new flag
+          flagsToUpdate.push({
+            name: flag.name,
+            _id: new mongoose.Types.ObjectId(),
+          });
+        }
+      });
+
+      const updatedProject = await Project.findByIdAndUpdate(
+        projectId,
+        { $set: { flags: flagsToUpdate } },
+        { new: true, fields: { flags: 1 } }
+      );
+
+      res.json(updatedProject ? updatedProject.flags : []);
     }
-
-    res.json(updatedProject.flags);
   } catch (error) {
     console.error("Error updating project flags:", error);
     res.status(500).send("Internal server error");
   }
+});
+
+/**
+ * Remove single annotator for a given project
+ */
+router.patch("/annotator/remove", async (req, res) => {
+  try {
+    const { annotatorId, projectId } = req.body;
+
+    console.log(annotatorId, projectId);
+
+    // Delete from 'project.annotators'
+    const project = await Project.findByIdAndUpdate(
+      projectId,
+      {
+        $pull: { annotators: annotatorId },
+      },
+      { new: true } // Returns the document after update
+    );
+
+    // Delete any associated notification
+    await Notifications.deleteMany({ projectId, receiverId: annotatorId });
+    // Delete all annotations.
+    await Annotations.deleteMany({ userId: annotatorId });
+
+    res.json(project.annotators);
+  } catch (error) {}
 });
 
 export default router;
