@@ -66,7 +66,7 @@ const Dashboard = () => {
     navigate("/projects");
   };
 
-  const handleUpdateSchema = async (key, newValue) => {
+  const handleUpdateSchema = async ({ key, newValue }) => {
     const data = await updateProjectSchema({
       projectId,
       newTags: newValue,
@@ -105,25 +105,15 @@ const Dashboard = () => {
     }
   };
 
-  const handleUpdateFlags = async (_, flags) => {
-    // Flags are provided by name, need to find their _id to send to backend to ensure
-    // no conflicts occur.
-    const updateFlags = flags.map((flag) => {
-      if (data.details.flags.includes(flag.name)) {
-        // Flag to be removed
-        return flag;
-      } else {
-        return flag;
-      }
-    });
-
-    // Send to backend
+  const handleUpdateFlags = async ({ key, value, isDelete = false }) => {
+    const flags = value;
     const updatedFlags = await updateProjectFlags({
       projectId,
-      flags: updateFlags,
+      flags,
+      isDelete,
     });
 
-    if (updateFlags) {
+    if (updatedFlags) {
       setData((prevState) => ({
         ...prevState,
         details: {
@@ -139,8 +129,30 @@ const Dashboard = () => {
     }
   };
 
-  const handleUpdateAnnotators = async () => {
-    alert("handleUpdateAnnotators - not implemented yet.");
+  const handleUpdateAnnotators = async ({ newAnnotators }) => {
+    setData((prevState) => {
+      const updatedData = { ...prevState };
+
+      // Assuming `newAnnotators` is an array of annotators to be toggled
+      for (const newAnnotator of newAnnotators) {
+        const annotatorId = newAnnotator._id.toString();
+        const index = updatedData.details.annotators.findIndex(
+          (a) => a._id.toString() === annotatorId
+        );
+
+        if (index > -1) {
+          // Annotator exists, remove them
+          console.log("removing existing annotator");
+          updatedData.details.annotators.splice(index, 1);
+        } else {
+          // Annotator does not exist, add them
+          console.log("adding new annotator");
+          updatedData.details.annotators.push(newAnnotator);
+        }
+      }
+
+      return updatedData;
+    });
   };
 
   if (loading)
