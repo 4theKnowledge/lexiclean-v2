@@ -13,7 +13,7 @@ import ModeEditIcon from "@mui/icons-material/ModeEdit";
 import DashboardIcon from "@mui/icons-material/Dashboard";
 import { truncateText } from "../../shared/utils/general";
 import ArticleIcon from "@mui/icons-material/Article";
-// import InsightsIcon from "@mui/icons-material/Insights";
+import InsightsIcon from "@mui/icons-material/Insights";
 import SettingsIcon from "@mui/icons-material/Settings";
 
 const ProjectCard = ({ index, project }) => {
@@ -24,25 +24,19 @@ const ProjectCard = ({ index, project }) => {
       icon: <ArticleIcon fontSize="inherit" color="inherit" />,
     },
     {
-      value: `${project.savedCount} / ${project.textCount}`,
-      title: "Texts Annotated",
-      icon: <ArticleIcon fontSize="inherit" color="inherit" />,
-    },
-    // {
-    //   value: `${Math.round(project.vocabReduction)}%`,
-    //   title: "Vocabulary reduction",
-    //   icon: <InsightsIcon fontSize="inherit" color="inherit" />,
-    // },
-    // {
-    //   value: `${project.startCandidateVocabSize - project.oovCorrections}
-    //   / ${project.startCandidateVocabSize}`,
-    //   title: "Vocabulary corrections",
-    //   icon: <InsightsIcon fontSize="inherit" color="inherit" />,
-    // },
-    {
       value: project.isParallelCorpusProject ? "Parallel" : "Standard",
       title: "Project Type",
       icon: <SettingsIcon fontSize="inherit" color="inherit" />,
+    },
+    {
+      value: `${project.saveCount} / ${project.textCount} (${project.progress}%)`,
+      title: "Texts Annotated (all annotators)",
+      icon: <InsightsIcon fontSize="inherit" color="inherit" />,
+    },
+    {
+      value: `${project.userSaveCount} / ${project.textCount} (${project.userProgress}%)`,
+      title: "Texts Annotated (you)",
+      icon: <InsightsIcon fontSize="inherit" color="inherit" />,
     },
   ];
 
@@ -66,13 +60,32 @@ const ProjectCard = ({ index, project }) => {
             </Typography>
           </Tooltip>
         </Box>
-        <LinearProgress
-          value={(project.savedCount / project.textCount) * 100}
-          variant="determinate"
-        />
-        <Box display="flex" p={2}>
+        <Tooltip placement="top" title="This is the progress you have made.">
+          <LinearProgress
+            sx={{ cursor: "help" }}
+            value={project.userProgress}
+            variant="determinate"
+          />
+        </Tooltip>
+        <Tooltip
+          placement="bottom"
+          title="This is the overall project progress."
+        >
+          <LinearProgress
+            sx={{ cursor: "help" }}
+            color="secondary"
+            value={project.progress}
+            variant="determinate"
+          />
+        </Tooltip>
+        <Box display="flex" p={2} gap={4}>
           <Stack direction="column" spacing={2}>
-            {projectProperties.map((p) => (
+            {projectProperties.slice(0, 2).map((p) => (
+              <StyledProperty value={p.value} title={p.title} icon={p.icon} />
+            ))}
+          </Stack>
+          <Stack direction="column" spacing={2}>
+            {projectProperties.slice(2, 4).map((p) => (
               <StyledProperty value={p.value} title={p.title} icon={p.icon} />
             ))}
           </Stack>
