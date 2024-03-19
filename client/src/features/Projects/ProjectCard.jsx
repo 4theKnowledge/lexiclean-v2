@@ -84,7 +84,6 @@ const ProjectCard = ({ index, project }) => {
         >
           <LinearProgress
             sx={{ cursor: "help", height: 8 }}
-            color="secondary"
             value={project.progress}
             variant="determinate"
           />
