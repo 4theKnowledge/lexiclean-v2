@@ -97,6 +97,17 @@ const computePairwiseSimilarity = (annotations) => {
 };
 
 export const documentLevelIAA = (annotations) => {
+  const annotatorIds = Object.keys(annotations);
+
+  if (annotatorIds.length === 1) {
+    // Single annotator project - default to perfect scores.
+    return [
+      100,
+      null,
+      new Array(annotations[annotatorIds[0]].tokens.length).fill(100),
+    ];
+  }
+
   const [pairwiseScores, combinations, tokenAverages] =
     computePairwiseSimilarity(annotations);
   if (!pairwiseScores.length) return 0;
