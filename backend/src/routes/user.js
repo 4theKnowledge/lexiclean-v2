@@ -1,5 +1,4 @@
 import express from "express";
-import { jwtDecode } from "jwt-decode";
 import User from "../models/User.js";
 
 const router = express.Router();
@@ -15,13 +14,6 @@ router.get("/", async (req, res) => {
     res.status(500).send("Internal Server Error");
   }
 });
-
-// router.get("/system", async (req, res) => {
-//   // Fetch system user which is used in the single annotator application variant.
-//   // TODO: Review this when the system's build config is put together.
-//   const user = await User.findOne({ username: "system" }).lean();
-//   res.json(user);
-// });
 
 router.patch("/:userId", async (req, res) => {
   try {
