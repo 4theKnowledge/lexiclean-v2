@@ -426,20 +426,21 @@ router.get("/feed", async (req, res) => {
       ],
     }).lean();
 
-    // Function to count texts with saves over a given number
-    function countTextsWithSavesOver(annotations, saveThreshold) {
+    // Function to count texts with saves meeting a given number
+    function countTextsWithSavesAtThreshold(annotations, saveThreshold) {
       const saveCounts = new Map();
 
       annotations.forEach(({ textId, type }) => {
+        textId = textId.toString();
         saveCounts.set(textId, (saveCounts.get(textId) || 0) + 1);
       });
 
-      let textsOverThreshold = 0;
+      let textsMeetingThreshold = 0;
       for (let count of saveCounts.values()) {
-        if (count > saveThreshold) textsOverThreshold++;
+        if (count >= saveThreshold) textsMeetingThreshold++;
       }
 
-      return textsOverThreshold;
+      return textsMeetingThreshold;
     }
 
     const output = await Promise.all(
@@ -460,7 +461,7 @@ router.get("/feed", async (req, res) => {
         const userProgress = (userSaveCount / numTexts) * 100;
 
         // Get projects progress - all users have saved the doc.
-        const projectSaveCount = countTextsWithSavesOver(
+        const projectSaveCount = countTextsWithSavesAtThreshold(
           annotations,
           numAnnotators
         );
@@ -473,10 +474,11 @@ router.get("/feed", async (req, res) => {
           description: project.description,
           progress,
           textCount: numTexts,
-          saveCount: 0,
+          saveCount: projectSaveCount,
           userSaveCount,
           userProgress,
           createdAt: project.createdAt,
+          annotators: numAnnotators,
         };
       })
     );
