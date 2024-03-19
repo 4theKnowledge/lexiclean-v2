@@ -103,13 +103,14 @@ const useDashboardActions = () => {
     }
   };
 
-  const updateProjectFlags = async ({ projectId, flags }) => {
+  const updateProjectFlags = async ({ projectId, flags, isDelete = false }) => {
     try {
       const data = await callApi(`/api/project/${projectId}/flags`, {
         method: "PATCH",
         data: {
           projectId,
           flags,
+          isDelete,
         },
       });
 
@@ -123,6 +124,31 @@ const useDashboardActions = () => {
     }
   };
 
+  const removeAnnotator = async ({ projectId, annotatorId }) => {
+    try {
+      const data = await callApi("/api/project/annotator/remove", {
+        method: "PATCH",
+        data: { projectId, annotatorId },
+      });
+
+      if (data) {
+        snackbarDispatch({
+          type: "SHOW",
+          message: `Successfully removed annotator`,
+          severity: "success",
+        });
+        return data;
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Failed to remove annotator: ${error}`,
+        severity: "error",
+      });
+      return;
+    }
+  };
+
   return {
     fetchProjectSummaryById,
     downloadProjectData,
@@ -130,6 +156,7 @@ const useDashboardActions = () => {
     updateProjectSchema,
     updateProjectDetail,
     updateProjectFlags,
+    removeAnnotator,
   };
 };
 
