@@ -75,7 +75,7 @@ const CreateProject = () => {
     setValues(initialState);
   };
 
-  const updateValue = (key, value) => {
+  const updateValue = ({ key, value }) => {
     setValues((prevState) => ({ ...prevState, [key]: value }));
   };
 

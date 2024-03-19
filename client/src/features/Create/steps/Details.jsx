@@ -6,7 +6,7 @@ const Details = ({ values, updateValue }) => {
       <CustomTextField
         value={values["projectName"]}
         setValueFunction={(targetValue) =>
-          updateValue("projectName", targetValue)
+          updateValue({ key: "projectName", value: targetValue })
         }
         title="Project Name"
         caption="Choose a distinctive name for your project. You can change this later."
@@ -15,7 +15,7 @@ const Details = ({ values, updateValue }) => {
       <CustomTextField
         value={values.projectDescription}
         setValueFunction={(targetValue) =>
-          updateValue("projectDescription", targetValue)
+          updateValue({ key: "projectDescription", value: targetValue })
         }
         title="Project Description"
         caption="Describe your project to provide context for annotators. You can edit this description at any time."

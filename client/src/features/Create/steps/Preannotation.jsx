@@ -14,7 +14,7 @@ const Preannotation = ({ values, updateValue }) => {
       <CustomTextField
         value={values.specialTokens}
         setValueFunction={(targetValue) =>
-          updateValue("specialTokens", targetValue)
+          updateValue({ key: "specialTokens", value: targetValue })
         }
         title="Are there any special tokens in your project?"
         caption="Enter your special tokens separated by commas (e.g., <id>, <sensitive>). These tokens will be recognised as part of the vocabulary when your project is created."
@@ -37,7 +37,7 @@ const Preannotation = ({ values, updateValue }) => {
           },
         ]}
         setValueFunction={(targetValue) =>
-          updateValue("preannotationReplacements", targetValue)
+          updateValue({ key: "preannotationReplacements", value: targetValue })
         }
       />
       <CustomCheckboxField
@@ -48,7 +48,7 @@ const Preannotation = ({ values, updateValue }) => {
           { label: "No", value: false, checked: !values.preannotationSchema },
         ]}
         setValueFunction={(targetValue) =>
-          updateValue("preannotationSchema", targetValue)
+          updateValue({ key: "preannotationSchema", value: targetValue })
         }
       />
       <CustomCheckboxField
@@ -59,7 +59,7 @@ const Preannotation = ({ values, updateValue }) => {
           { label: "No", value: false, checked: !values.preannotationDigits },
         ]}
         setValueFunction={(targetValue) =>
-          updateValue("preannotationDigits", targetValue)
+          updateValue({ key: "preannotationDigits", value: targetValue })
         }
       />
       <CustomCheckboxField
@@ -70,7 +70,7 @@ const Preannotation = ({ values, updateValue }) => {
           { label: "No", value: false, checked: !values.preannotationRanking },
         ]}
         setValueFunction={(targetValue) =>
-          updateValue("preannotationRanking", targetValue)
+          updateValue({ key: "preannotationRanking", value: targetValue })
         }
       />
     </Stack>

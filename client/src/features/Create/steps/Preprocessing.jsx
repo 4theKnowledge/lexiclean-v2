@@ -155,7 +155,10 @@ const Preprocessing = ({ values, updateValue }) => {
                   <Checkbox
                     checked={values["preprocessLowerCase"]}
                     onChange={(e) => {
-                      updateValue("preprocessLowerCase", e.target.checked);
+                      updateValue({
+                        key: "preprocessLowerCase",
+                        value: e.target.checked,
+                      });
                     }}
                     name="remove-casing"
                     title="Removes casing from characters. This can reduce annotation effort."
@@ -168,7 +171,10 @@ const Preprocessing = ({ values, updateValue }) => {
                   <Checkbox
                     checked={values["preprocessRemoveChars"]}
                     onChange={(e) => {
-                      updateValue("preprocessRemoveChars", e.target.checked);
+                      updateValue({
+                        key: "preprocessRemoveChars",
+                        value: e.target.checked,
+                      });
                     }}
                     title="Removes special characters from corpus. This can reduce annotation effort."
                     name="remove-chars"
@@ -182,10 +188,10 @@ const Preprocessing = ({ values, updateValue }) => {
                   <Checkbox
                     checked={values["preprocessRemoveDuplicates"]}
                     onChange={(e) => {
-                      updateValue(
-                        "preprocessRemoveDuplicates",
-                        e.target.checked
-                      );
+                      updateValue({
+                        key: "preprocessRemoveDuplicates",
+                        value: e.target.checked,
+                      });
                     }}
                     title="Removes duplicate documents from your corpus. This can reduce annotation effort."
                     name="remove-duplicates"
@@ -201,7 +207,10 @@ const Preprocessing = ({ values, updateValue }) => {
                 autoComplete="off"
                 value={values["preprocessRemoveCharSet"]}
                 onChange={(e) => {
-                  updateValue("preprocessRemoveCharSet", e.target.value);
+                  updateValue({
+                    key: "preprocessRemoveCharSet",
+                    value: e.target.value,
+                  });
                 }}
                 disabled={!values["preprocessRemoveChars"]}
                 placeholder={values["preprocessRemoveCharSet"]}

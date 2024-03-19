@@ -30,20 +30,23 @@ const JsonEditor = ({ values, updateValue }) => {
 
   const handleJsonChange = (event) => {
     const { value } = event.target;
-    updateValue("replacementDictionary", value);
+    updateValue({ key: "replacementDictionary", value });
     if (value.trim() === "") {
       setError("");
-      updateValue("replacementDictionary", ""); // Update the parent state with an empty object
+      updateValue({ key: "replacementDictionary", value: "" }); // Update the parent state with an empty object
     } else {
       validateJson(value);
-      updateValue("replacementDictionary", value);
+      updateValue({ key: "replacementDictionary", value });
     }
   };
 
   const prettifyJson = () => {
     try {
       const obj = JSON.parse(values.replacementDictionary);
-      updateValue("replacementDictionary", JSON.stringify(obj, null, 2));
+      updateValue({
+        key: "replacementDictionary",
+        value: JSON.stringify(obj, null, 2),
+      });
       setError("");
     } catch (e) {
       setError("Cannot prettify invalid JSON.");
@@ -51,7 +54,7 @@ const JsonEditor = ({ values, updateValue }) => {
   };
 
   const handleUndo = () => {
-    updateValue("replacementDictionary", "{}");
+    updateValue({ key: "replacementDictionary", value: "{}" });
   };
 
   return (

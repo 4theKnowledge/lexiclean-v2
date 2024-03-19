@@ -51,8 +51,8 @@ const Upload = (props) => {
   };
 
   const resetCorpus = () => {
-    updateValue("corpus", []);
-    updateValue("corpusFileName", null);
+    updateValue({ key: "corpus", value: [] });
+    updateValue({ key: "corpusFileName", value: null });
   };
 
   const [showModal, setShowModal] = useState(false);
@@ -97,12 +97,15 @@ const Upload = (props) => {
           .filter((line) => line !== "")
           .map((line) => line.replace("\r", ""));
 
-        updateValue(
-          "corpus",
-          Object.assign({}, ...corpus.map((text, index) => ({ [index]: text })))
-        );
-        updateValue("corpusFileName", fileName);
-        updateValue("corpusType", corpusType);
+        updateValue({
+          key: "corpus",
+          value: Object.assign(
+            {},
+            ...corpus.map((text, index) => ({ [index]: text }))
+          ),
+        });
+        updateValue({ key: "corpusFileName", value: fileName });
+        updateValue({ key: "corpusType", value: corpusType });
       }
       if (fileExt === "csv" && corpusType === "identifiers") {
         // Uploading data with identifiers
@@ -121,9 +124,9 @@ const Upload = (props) => {
         // Combine row objects into { id: document } objects
         const csvData = Object.assign({}, ...rowsObject);
 
-        updateValue("corpus", csvData);
-        updateValue("corpusFileName", fileName);
-        updateValue("corpusType", corpusType);
+        updateValue({ key: "corpus", value: csvData });
+        updateValue({ key: "corpusFileName", value: fileName });
+        updateValue({ key: "corpusType", value: corpusType });
       }
 
       if (fileExt === "json" && corpusType === "parallel") {
@@ -136,9 +139,9 @@ const Upload = (props) => {
           }))
         );
 
-        updateValue("corpus", corpus);
-        updateValue("corpusFileName", fileName);
-        updateValue("corpusType", corpusType);
+        updateValue({ key: "corpus", value: corpus });
+        updateValue({ key: "corpusFileName", value: fileName });
+        updateValue({ key: "corpusType", value: corpusType });
       }
     };
     reader.onloadend = () => {
@@ -356,7 +359,9 @@ const Upload = (props) => {
           placeholder="Enter corpus manually or upload"
           multiline
           rows={20}
-          onChange={(e) => updateValue("corpus", e.target.value.split("\n"))}
+          onChange={(e) =>
+            updateValue({ key: "corpus", value: e.target.value.split("\n") })
+          }
           value={parseCorpus(corpus)}
           fullWidth
           InputProps={{
@@ -371,7 +376,9 @@ const Upload = (props) => {
             label={"Special tokens (e.g. <id>, <num>, <date>)"}
             placeholder="Enter comma separated special tokens"
             fullWidth
-            onChange={(e) => updateValue("specialTokens", e.target.value)}
+            onChange={(e) =>
+              updateValue({ key: "specialTokens", value: e.target.value })
+            }
             value={values["specialTokens"]}
           />
         </Grid>
