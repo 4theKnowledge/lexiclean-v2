@@ -47,6 +47,7 @@ const columns = [
             <Tooltip
               title={`${userName} used this replacement ${count} times`}
               placement="top"
+              arrow
             >
               <Chip
                 sx={{ cursor: "help" }}
@@ -81,6 +82,7 @@ const Replacements = ({ data }) => {
             columns: {
               columnVisibilityModel: {
                 id: false,
+                new: false,
               },
             },
           }}
