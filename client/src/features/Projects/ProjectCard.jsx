@@ -15,6 +15,7 @@ import { truncateText } from "../../shared/utils/general";
 import ArticleIcon from "@mui/icons-material/Article";
 import InsightsIcon from "@mui/icons-material/Insights";
 import SettingsIcon from "@mui/icons-material/Settings";
+import PeopleIcon from "@mui/icons-material/People";
 
 const ProjectCard = ({ index, project }) => {
   const projectProperties = [
@@ -27,6 +28,11 @@ const ProjectCard = ({ index, project }) => {
       value: project.isParallelCorpusProject ? "Parallel" : "Standard",
       title: "Project Type",
       icon: <SettingsIcon fontSize="inherit" color="inherit" />,
+    },
+    {
+      value: project.annotators,
+      title: "Annotators",
+      icon: <PeopleIcon fontSize="inherit" color="inherit" />,
     },
     {
       value: `${project.saveCount} / ${project.textCount} (${project.progress}%)`,
@@ -60,19 +66,24 @@ const ProjectCard = ({ index, project }) => {
             </Typography>
           </Tooltip>
         </Box>
-        <Tooltip placement="top" title="This is the progress you have made.">
+        <Tooltip
+          placement="top"
+          title="This is the progress you have made."
+          arrow
+        >
           <LinearProgress
-            sx={{ cursor: "help" }}
+            sx={{ cursor: "help", height: 8 }}
             value={project.userProgress}
             variant="determinate"
           />
         </Tooltip>
         <Tooltip
           placement="bottom"
+          arrow
           title="This is the overall project progress."
         >
           <LinearProgress
-            sx={{ cursor: "help" }}
+            sx={{ cursor: "help", height: 8 }}
             color="secondary"
             value={project.progress}
             variant="determinate"
@@ -80,12 +91,12 @@ const ProjectCard = ({ index, project }) => {
         </Tooltip>
         <Box display="flex" p={2} gap={4}>
           <Stack direction="column" spacing={2}>
-            {projectProperties.slice(0, 2).map((p) => (
+            {projectProperties.slice(0, 3).map((p) => (
               <StyledProperty value={p.value} title={p.title} icon={p.icon} />
             ))}
           </Stack>
           <Stack direction="column" spacing={2}>
-            {projectProperties.slice(2, 4).map((p) => (
+            {projectProperties.slice(3).map((p) => (
               <StyledProperty value={p.value} title={p.title} icon={p.icon} />
             ))}
           </Stack>
