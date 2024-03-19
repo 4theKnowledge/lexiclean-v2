@@ -22,9 +22,31 @@ import {
 import { textTokenSearchPipeline } from "../aggregations/token.js";
 import { annotationsWithTokenDataPipeline } from "../aggregations/annotation.js";
 import Notifications from "../models/Notifications.js";
+import {
+  compileTokens,
+  documentLevelIAA,
+  getUserAnnotations,
+} from "../services/project.js";
 
 const router = express.Router();
 const REPLACEMENT_COLOR = "#03a9f4";
+
+// Function to count texts with saves meeting a given number
+const countTextsWithSavesAtThreshold = (annotations, saveThreshold) => {
+  const saveCounts = new Map();
+
+  annotations.forEach(({ textId, type }) => {
+    textId = textId.toString();
+    saveCounts.set(textId, (saveCounts.get(textId) || 0) + 1);
+  });
+
+  let textsMeetingThreshold = 0;
+  for (let count of saveCounts.values()) {
+    if (count >= saveThreshold) textsMeetingThreshold++;
+  }
+
+  return textsMeetingThreshold;
+};
 
 router.post("/create", async (req, res) => {
   logger.info("Creating project", { route: "/api/project/create" });
@@ -426,23 +448,6 @@ router.get("/feed", async (req, res) => {
       ],
     }).lean();
 
-    // Function to count texts with saves meeting a given number
-    function countTextsWithSavesAtThreshold(annotations, saveThreshold) {
-      const saveCounts = new Map();
-
-      annotations.forEach(({ textId, type }) => {
-        textId = textId.toString();
-        saveCounts.set(textId, (saveCounts.get(textId) || 0) + 1);
-      });
-
-      let textsMeetingThreshold = 0;
-      for (let count of saveCounts.values()) {
-        if (count >= saveThreshold) textsMeetingThreshold++;
-      }
-
-      return textsMeetingThreshold;
-    }
-
     const output = await Promise.all(
       projects.map(async (project) => {
         const annotations = await Annotations.find({
@@ -707,185 +712,7 @@ router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
     const textIds = project.texts;
     delete project.texts;
 
-    const annotators = project.annotators;
-    const annotatorIds = annotators.map((a) => a._id.toString());
-    const annotatorIdToUsername = Object.assign(
-      {},
-      ...annotators.map((a) => ({
-        [a._id.toString()]: a.username,
-      }))
-    );
-
-    const flagIdToName = Object.assign(
-      {},
-      ...project.flags.map((f) => ({
-        [f._id.toString()]: f.name,
-      }))
-    );
-    const tagIdToName = Object.assign(
-      {},
-      ...project.tags.map((t) => ({
-        [t._id.toString()]: t.name,
-      }))
-    );
-
-    const texts = await Text.find({ _id: { $in: textIds } }).lean();
-
-    const annotations = await Annotations.find({
-      textId: { $in: textIds },
-    }).lean();
-
-    // Separate tokenAnnotations and textAnnotations programmatically
-    const tokenAnnotations = annotations.filter((ann) => ann.tokenId);
-    const textAnnotations = annotations.filter((ann) => !ann.tokenId);
-
-    // Convert annotations into {annotatorId: {textId: {tokenId: [annotations]}}} format
-    const tokenAnnotationsAggregated = tokenAnnotations.reduce(
-      (acc, annotation) => {
-        const userIdStr = annotation.userId.toString();
-        const username = annotatorIdToUsername[userIdStr];
-        const textIdStr = annotation.textId.toString();
-        const tokenIdStr = annotation.tokenId.toString();
-
-        // Initialize annotatorId level if it doesn't exist
-        if (!acc[username]) {
-          acc[username] = {};
-        }
-
-        // Initialize textId level if it doesn't exist
-        if (!acc[username][textIdStr]) {
-          acc[username][textIdStr] = {};
-        }
-
-        // Initialize tokenId level if it doesn't exist, with an empty array to push annotations into
-        if (!acc[username][textIdStr][tokenIdStr]) {
-          acc[username][textIdStr][tokenIdStr] = {
-            tag: [],
-            replacement: null,
-          };
-        }
-
-        // Push the current annotation into the correct place in the structure
-        if (annotation.type === "tag") {
-          acc[username][textIdStr][tokenIdStr][annotation.type].push(
-            tagIdToName[annotation.value.toString()]
-          );
-        }
-        if (annotation.type === "replacement" && !annotation.isSuggestion) {
-          acc[username][textIdStr][tokenIdStr][annotation.type] =
-            annotation.value;
-        }
-
-        return acc;
-      },
-      {}
-    );
-
-    const textAnnotationsAggregated = textAnnotations.reduce(
-      (acc, annotation) => {
-        const userIdStr = annotation.userId.toString();
-        const username = annotatorIdToUsername[userIdStr];
-        const textIdStr = annotation.textId.toString();
-
-        // Initialize annotatorId level if it doesn't exist
-        if (!acc[username]) {
-          acc[username] = {};
-        }
-
-        // Initialize textId level if it doesn't exist
-        if (!acc[username][textIdStr]) {
-          acc[username][textIdStr] = { flag: [], save: false };
-        }
-
-        // Push the current annotation into the correct place in the structure
-        if (annotation.type === "save") {
-          acc[username][textIdStr][annotation.type] = true;
-        }
-        if (annotation.type === "flag") {
-          acc[username][textIdStr][annotation.type].push(
-            flagIdToName[annotation.value.toString()]
-          );
-        }
-
-        return acc;
-      },
-      {}
-    );
-
-    const outputAnnotations = texts.map((text) => {
-      const textIdStr = text._id.toString();
-
-      let tags = {};
-      let replacements = {};
-      let flags = {};
-      let saves = {};
-
-      // Iterate over annotator ids
-      for (const annotatorId of annotatorIds) {
-        const annotatorIdStr = annotatorId.toString();
-        const username = annotatorIdToUsername[annotatorIdStr];
-
-        // Initialize tags and replacements arrays for each annotator if they don't exist
-        tags[username] = tags[username] || [];
-        replacements[username] = replacements[username] || [];
-        flags[username] = flags[username] || [];
-        saves[username] = saves[username] || [];
-
-        // Iterate over tokens
-        for (const token of text.tokens) {
-          const tokenIdStr = token._id.toString();
-          const tokenAnnotations =
-            tokenAnnotationsAggregated[username]?.[textIdStr]?.[tokenIdStr];
-
-          const annotatorReplacement =
-            tokenAnnotations?.replacement ?? token.value;
-          replacements[username].push(annotatorReplacement);
-
-          // Handle tag
-          const annotatorTag = tokenAnnotations?.tag ?? [];
-          // console.log("annotatorTag: ", annotatorTag);
-          if (annotatorTag.length > 0) {
-            tags[username].push(annotatorTag); // Spread to merge arrays
-          } else {
-            // If no tags for this token, push an empty array to maintain structure
-            tags[username].push([]);
-          }
-        }
-
-        // Text-level annotations: Check if username exists for text-level flags
-        if (
-          textAnnotationsAggregated[username] &&
-          textAnnotationsAggregated[username][textIdStr].flag
-        ) {
-          flags[username] = textAnnotationsAggregated[username][textIdStr].flag;
-        } else {
-          // If no text-level annotations exist for this annotator, ensure the structure is maintained
-          flags[username] = [];
-        }
-
-        if (
-          textAnnotationsAggregated[username] &&
-          textAnnotationsAggregated[username][textIdStr].save
-        ) {
-          saves[username] = textAnnotationsAggregated[username][textIdStr].save;
-        } else {
-          // If no text-level annotations exist for this annotator, ensure the structure is maintained
-          saves[username] = false;
-        }
-      }
-
-      return {
-        id: text._id,
-        identifiers: text.identifiers,
-        source: text.original,
-        sourceTokens: text.original.split(" "),
-        reference: text?.reference ?? "",
-        tags,
-        replacements,
-        flags,
-        saves,
-      };
-    });
+    const outputAnnotations = await getUserAnnotations(projectId);
 
     const payload = {
       metadata: {
@@ -894,8 +721,6 @@ router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
         totalTexts: textIds.length,
       },
       annotations: outputAnnotations,
-      tokenAnnotationsAggregated,
-      textAnnotationsAggregated,
     };
 
     res.json(payload);
@@ -907,11 +732,6 @@ router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
 
 /**
  * Fetch project summary for client dashboard.
- * TODO: Expand for multi-user
- * TODO:
- * - Need to fetch user usernames to populate replacement history.
- * - Need to populate replacements to get original token value to use as 'input'
- * - Need to aggregate the replacements to get the count of how many times the user did it.
  */
 router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
   try {
@@ -923,6 +743,9 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
     })
       .populate("annotators")
       .lean();
+
+    const numTexts = project.texts.length;
+    const numAnnotators = project.annotators.length;
 
     // Check if user is owner of project
     const isOwner = project.owner.toString() === userId.toString();
@@ -941,11 +764,24 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
 
     const textIds = project.texts.map((t) => mongoose.Types.ObjectId(t));
 
-    const savedTexts = await Annotations.count({
-      userId,
+    const savedTexts = await Annotations.find({
       textId: { $in: textIds },
       type: "save",
     });
+
+    // Get users progress
+    const userSaveCount = savedTexts.filter(
+      (a) => a.userId.toString() === userId.toString()
+    ).length;
+
+    const userProgress = (userSaveCount / numTexts) * 100;
+
+    // Get projects progress - all users have saved the doc.
+    const projectSaveCount = countTextsWithSavesAtThreshold(
+      savedTexts,
+      numAnnotators
+    );
+    const progress = (projectSaveCount / numTexts) * 100;
 
     const populatedReplacements = await Annotations.aggregate(
       annotationsWithTokenDataPipeline({
@@ -1080,27 +916,46 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
     ];
 
     // adjudication... sends the first 50 documents - TODO: add dedicated route to "show more".
+    const userAnnotations = await getUserAnnotations(projectId);
 
-    const adjudicatedTexts = [
-      {
-        input: ["hell", "Xorld"],
-        annotations: {
-          user1: {
-            labels: { 0: "Cat" },
-            tokens: ["hello", "world"],
-            flags: ["unsure"],
-          },
-          user2: {
-            labels: { 0: "Cat", 1: "Dog" },
-            tokens: ["Hello", "world"],
-            flags: [],
-          },
+    const adjudicationData = userAnnotations.map((text) => {
+      let transformed = {
+        _id: text.id, // Copy the id to _id
+        input: text.sourceTokens, // Copy the sourceTokens directly
+        annotations: {},
+      };
+
+      // Iterate through the users in the replacements to structure the annotations
+      Object.keys(text.replacements).forEach((user) => {
+        transformed.annotations[user] = {
+          tags: text.tags[user] ? text.tags[user][1] : [], // Second element of tags array or an empty array if not exist
+          tokens: text.replacements[user], // Use the tokens from replacements
+          flags: text.flags[user] || [], // Copy flags, default to an empty array if not exist
+        };
+      });
+
+      // GET IAA
+      const [iaaScore, pairwiseScores, tokenAverages] = documentLevelIAA(
+        transformed.annotations
+      );
+
+      const compiledTokens = compileTokens(transformed.annotations);
+      // console.log("compiledTokens: ", compiledTokens);
+
+      transformed = {
+        ...transformed,
+        compiled: { tokens: compiledTokens },
+        scores: {
+          doc: iaaScore,
+          pairwise: pairwiseScores,
+          tokens: tokenAverages,
         },
-        compiled: { tokens: ["hello", "world"], labels: { 0: "Cat" } },
-      },
-    ];
+      };
 
-    // const adjudicatedTexts = project.texts.slice(0, 50);
+      return transformed;
+    });
+
+    console.log("adjudicationData: ", adjudicationData);
 
     res.json({
       isOwner,
@@ -1125,13 +980,13 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
         },
         {
           name: "Texts Annotated",
-          value: savedTexts,
+          value: projectSaveCount,
           description:
-            "Number of texts where changes have been reviewed and saved by annotators.",
+            "Number of texts where changes have been reviewed and saved by all annotators.",
         },
         {
           name: "Annotation Progress",
-          value: Math.round((savedTexts / project.texts.length) * 100),
+          value: progress,
           description:
             "Percentage of the project's texts that have been saved, indicating overall progress.",
         },
@@ -1145,7 +1000,7 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
           name: "Adjusted Vocabulary Size",
           value: vocabSize,
           description:
-            "The current size of the vocabulary after applying corrections and normalisations.",
+            "Under review: The current size of the vocabulary after applying corrections and normalisations.",
         },
         {
           name: "Vocabulary Reduction Rate",
@@ -1155,7 +1010,7 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
               100
           ),
           description:
-            "Percentage reduction in vocabulary size from the start of the project to the current state.",
+            "Under review: Percentage reduction in vocabulary size from the start of the project to the current state.",
         },
         {
           name: "Initial Token Count",
@@ -1167,36 +1022,36 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
           name: "Current Token Count",
           value: currentTokenCount,
           description:
-            "Current total number of tokens across all texts, reflecting any additions or deletions.",
+            "Under review: Current total number of tokens across all texts, reflecting any additions or deletions.",
         },
         {
           name: "Corrections Applied",
           value: correctionsMade,
           description:
-            "Total number of corrections or normalizations applied to tokens throughout the project.",
+            "Under review: Total number of corrections or normalizations applied to tokens throughout the project.",
         },
         {
           name: "Unnormalised Tokens",
           value: currentOOVTokens,
           description:
-            "Current number of out-of-vocabulary (OOV) tokens that have not yet been normalised or corrected.",
+            "Under review: Current number of out-of-vocabulary (OOV) tokens that have not yet been normalised or corrected.",
         },
         {
           name: "Inter-Annotator Agreement",
           value: "TBD",
           description:
-            "The consistency of annotations across different annotators. A higher percentage indicates greater agreement and reliability of the annotations.",
+            "Under review: The consistency of annotations across different annotators. A higher percentage indicates greater agreement and reliability of the annotations.",
         },
         {
           name: "Greatest Contributor",
           value: "TBD",
           description:
-            "The annotator who has made the most contributions (annotations or corrections) to the project.",
+            "Under review: The annotator who has made the most contributions (annotations or corrections) to the project.",
         },
       ],
       lists: {
         replacementHistory,
-        adjudicatedTexts,
+        adjudicationTexts: adjudicationData,
       },
     });
   } catch (error) {
