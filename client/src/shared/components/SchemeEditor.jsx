@@ -48,7 +48,7 @@ const SchemaEditor = ({
 
   const createTag = (tag) => {
     // console.log("Creating Tag");
-    updateValue("tags", [...values.tags, tag]);
+    updateValue({ key: "tags", value: [...values.tags, tag] });
   };
 
   const createNewTag = () => {
@@ -68,7 +68,7 @@ const SchemaEditor = ({
   const deleteTag = (index) => {
     // console.log("Deleting Tag");
     const newTags = values.tags.filter((_, idx) => idx !== index);
-    updateValue("tags", newTags);
+    updateValue({ key: "tags", value: newTags });
     setCurrentTag(tagTemplate);
     setSelectedTagIndex();
   };

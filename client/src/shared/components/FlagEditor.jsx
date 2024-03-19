@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import {
   Box,
   Button,
@@ -10,7 +11,12 @@ import {
   Typography,
 } from "@mui/material";
 
-const FlagEditor = ({ values, updateValue, disabled = false }) => {
+const FlagEditor = ({
+  values,
+  updateValue,
+  isDashboard = false,
+  disabled = false,
+}) => {
   const [input, setInput] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editingIndex, setEditingIndex] = useState(-1);
@@ -20,7 +26,7 @@ const FlagEditor = ({ values, updateValue, disabled = false }) => {
       // Unselect flag
       resetForm();
     } else {
-      setInput(flag);
+      setInput(flag.name);
       setIsEditing(true);
       setEditingIndex(index);
     }
@@ -32,19 +38,31 @@ const FlagEditor = ({ values, updateValue, disabled = false }) => {
     let updatedFlags;
     if (isEditing) {
       updatedFlags = [...values];
-      updatedFlags[editingIndex] = input.trim();
+      updatedFlags[editingIndex] = {
+        ...updatedFlags[editingIndex],
+        name: input.trim(),
+      };
     } else {
-      if (values.includes(input.trim())) return; // Prevent duplicates when adding
-      updatedFlags = [...values, input.trim()];
+      const isDuplicate = values.some((flag) => flag.name === input.trim());
+      if (isDuplicate) return;
+      updatedFlags = [...values, { name: input.trim(), _id: uuidv4() }];
     }
-    console.log("updatedFlags: ", updatedFlags);
-    updateValue("flags", updatedFlags);
+    updateValue({ key: "flags", value: updatedFlags });
     resetForm();
   };
 
   const removeFlag = (flagToRemove) => {
-    const updatedFlags = values.filter((flag) => flag !== flagToRemove);
-    updateValue("flags", updatedFlags);
+    let updatedFlags;
+    if (isDashboard) {
+      updatedFlags = [flagToRemove];
+    } else {
+      updatedFlags = values.filter(
+        (flag) =>
+          flag._id !== flagToRemove._id || flag.name !== flagToRemove.name
+      );
+    }
+
+    updateValue({ key: "flags", value: updatedFlags, isDelete: true }); // isDelete prop is for dashboard use when interfacing with backend.
     if (isEditing) {
       resetForm();
     }
@@ -114,8 +132,8 @@ const FlagEditor = ({ values, updateValue, disabled = false }) => {
             <Stack direction="row" spacing={1}>
               {values.map((flag, index) => (
                 <Chip
-                  key={index}
-                  label={flag}
+                  key={index._id}
+                  label={flag.name}
                   onClick={() => handleFlagClick(flag, index)}
                   onDelete={() => (disabled ? {} : removeFlag(flag))}
                   deletable
