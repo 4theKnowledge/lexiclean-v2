@@ -119,7 +119,7 @@ export function AppProvider({ children }) {
       };
       initializeApp();
     } else {
-      console.log("logging out..."); // TODO review why this is happening.
+      // console.log("logging out..."); // TODO review why this is happening.
       dispatch({ type: "LOGOUT_USER" });
     }
   }, [isAuthenticated, auth0User]);
