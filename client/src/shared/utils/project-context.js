@@ -6,13 +6,18 @@ export const updateTexts = (
   replacement
 ) => {
   /**
-   * Performs operations on a set of texts comprised of token(s) such as apply, accept, or delete.
-   * `textTokenIds` is {textId: [tokenId, ..., tokenId]}`
+   * Performs operations on a set of texts comprised of token(s) such as apply, accept, or delete.`textTokenIds` = {textId: [tokenId, ..., tokenId]}`
    */
 
   let updatedTexts = texts;
 
-  Object.keys(textTokenIds).map((textId) => {
+  Object.keys(textTokenIds).forEach((textId) => {
+    // Check if the text exists for the given textId
+    if (!texts[textId]) {
+      // console.warn(`No text found for textId: ${textId}`);
+      return; // Skip this iteration if text is undefined
+    }
+
     const tokenIdsToUpdate = textTokenIds[textId];
 
     const text = texts[textId];
@@ -20,7 +25,7 @@ export const updateTexts = (
       if (tokenIdsToUpdate.includes(token._id)) {
         switch (action) {
           case "apply":
-            if (focusTokenId == token._id) {
+            if (focusTokenId.toString() === token._id.toString()) {
               // Only token action was applied to is a replacement, rest are suggestions.
               return {
                 ...token,
@@ -72,13 +77,17 @@ export const updateTextTokenTags = ({
   entityLabelId,
 }) => {
   /**
-   * Performs operations on a set of texts comprised of token(s) such as apply, accept, or delete.
-   * `textTokenIds` is {textId: [tokenId, ..., tokenId]}`
+   * Performs operations on a set of texts comprised of token(s) such as apply, accept, or delete. `textTokenIds` = {textId: [tokenId, ..., tokenId]}`
    */
 
   let updatedTexts = texts;
 
-  Object.keys(textTokenIds).map((textId) => {
+  Object.keys(textTokenIds).forEach((textId) => {
+    // Check if the text exists for the given textId
+    if (!texts[textId]) {
+      // console.warn(`No text found for textId: ${textId}`);
+      return; // Skip this iteration if text is undefined
+    }
     const tokenIdsToUpdate = textTokenIds[textId];
 
     const text = texts[textId];
