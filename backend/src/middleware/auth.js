@@ -1,9 +1,15 @@
-import { tokenGetUserId } from "../utils/auth.js";
 import Project from "../models/Project.js";
+import { getAuthStrategy } from "../auth/userAuthStrategyConfig.js";
 
 export const authenticateUser = async (req, res, next) => {
   try {
-    const userId = await tokenGetUserId(req.headers.authorization);
+    const authStrategy = getAuthStrategy();
+    const userId = await authStrategy.validateAndCreateUser(
+      req.headers.authorization
+    );
+
+    console.log("userId: ", userId);
+
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized: User not found." });
     }

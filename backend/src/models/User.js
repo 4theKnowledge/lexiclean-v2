@@ -43,7 +43,7 @@ const UserSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    auth0Id: {
+    authId: {
       type: String,
       required: true,
       unique: true,
