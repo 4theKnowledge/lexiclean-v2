@@ -149,6 +149,28 @@ const useDashboardActions = () => {
     }
   };
 
+  const getAdjudication = async ({ projectId, page }) => {
+    try {
+      const data = await callApi(
+        `/api/project/${projectId}/adjudication/${page}`,
+        {
+          method: "GET",
+        }
+      );
+
+      if (data) {
+        return data;
+      }
+    } catch (error) {
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Failed to get adjudicated text: ${error}`,
+        severity: "error",
+      });
+      return;
+    }
+  };
+
   return {
     fetchProjectSummaryById,
     downloadProjectData,
@@ -157,6 +179,7 @@ const useDashboardActions = () => {
     updateProjectDetail,
     updateProjectFlags,
     removeAnnotator,
+    getAdjudication,
   };
 };
 
