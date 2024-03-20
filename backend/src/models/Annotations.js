@@ -35,6 +35,7 @@ const AnnotationSchema = mongoose.Schema(
         validator: function (value) {
           switch (this.type) {
             case "flag":
+              return value instanceof mongoose.Types.ObjectId;
             case "tag":
               return value instanceof mongoose.Types.ObjectId;
             case "replacement":
