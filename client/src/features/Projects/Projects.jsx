@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
-import { Grid, Button, CircularProgress, Box } from "@mui/material";
+import {
+  Grid,
+  Button,
+  CircularProgress,
+  Box,
+  Alert,
+  AlertTitle,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import ProjectCard from "./ProjectCard";
 import useProjectActions from "../../shared/hooks/api/project";
@@ -8,18 +15,32 @@ const Projects = () => {
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState();
   const { fetchProjects: fetchProjectsAction } = useProjectActions();
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchProjects = async () => {
       const data = await fetchProjectsAction();
-      setProjects(data);
-      setLoading(false);
+      if (data) {
+        setProjects(data);
+        setLoading(false);
+      } else {
+        setError("Unable to fetch data");
+      }
     };
 
     if (loading) {
       fetchProjects();
     }
   }, [loading]);
+
+  if (error) {
+    return (
+      <Alert>
+        <AlertTitle>Error</AlertTitle>
+        {error}
+      </Alert>
+    );
+  }
 
   return (
     <Grid container item xs={12}>
