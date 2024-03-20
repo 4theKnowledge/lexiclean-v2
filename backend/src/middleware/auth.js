@@ -8,8 +8,6 @@ export const authenticateUser = async (req, res, next) => {
       req.headers.authorization
     );
 
-    console.log("userId: ", userId);
-
     if (!userId) {
       return res.status(401).json({ message: "Unauthorized: User not found." });
     }
