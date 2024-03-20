@@ -222,7 +222,7 @@ const Dashboard = () => {
           />
         </Grid>
         <Grid item xs={12}>
-          <Adjudication loading={loading} data={data.lists.adjudicationTexts} />
+          <Adjudication loading={loading} />
         </Grid>
         <Grid item xs={12}>
           <Settings
