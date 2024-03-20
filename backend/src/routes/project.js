@@ -943,48 +943,6 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
       ...invitedUsers,
     ];
 
-    // adjudication... sends the first 50 documents - TODO: add dedicated route to "show more".
-    const userAnnotations = await getUserAnnotations(projectId);
-
-    const adjudicationData = userAnnotations.map((text) => {
-      let transformed = {
-        _id: text.id, // Copy the id to _id
-        input: text.sourceTokens, // Copy the sourceTokens directly
-        annotations: {},
-      };
-
-      // Iterate through the users in the replacements to structure the annotations
-      Object.keys(text.replacements).forEach((user) => {
-        transformed.annotations[user] = {
-          tags: text.tags[user] ? text.tags[user][1] : [], // Second element of tags array or an empty array if not exist
-          tokens: text.replacements[user], // Use the tokens from replacements
-          flags: text.flags[user] || [], // Copy flags, default to an empty array if not exist
-        };
-      });
-
-      // GET IAA
-      const [iaaScore, pairwiseScores, tokenAverages] = documentLevelIAA(
-        transformed.annotations
-      );
-
-      const compiledTokens = compileTokens(transformed.annotations);
-      // console.log("compiledTokens: ", compiledTokens);
-
-      transformed = {
-        ...transformed,
-        compiled: { tokens: compiledTokens },
-        scores: {
-          doc: iaaScore,
-          pairwise: pairwiseScores,
-          tokens: tokenAverages,
-        },
-      };
-
-      return transformed;
-    });
-
-    console.log("adjudicationData: ", adjudicationData);
-
     res.json({
       isOwner,
       details: {
@@ -1079,7 +1037,6 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
       ],
       lists: {
         replacementHistory,
-        adjudicationTexts: adjudicationData,
       },
     });
   } catch (error) {
@@ -1162,7 +1119,7 @@ router.patch("/:projectId/flags", projectManagementCheck, async (req, res) => {
 /**
  * Remove single annotator for a given project
  */
-router.patch("/annotator/remove", async (req, res) => {
+router.patch("/annotator/remove", projectManagementCheck, async (req, res) => {
   try {
     const { annotatorId, projectId } = req.body;
 
@@ -1187,3 +1144,66 @@ router.patch("/annotator/remove", async (req, res) => {
 });
 
 export default router;
+
+router.get(
+  "/:projectId/adjudication/:page",
+  projectAccessCheck,
+  async (req, res) => {
+    // Limit is 1 document at a time so only need page
+    const DOCUMENT_LIMIT = 1;
+
+    try {
+      const { projectId, page } = req.params;
+      const pageNumber = Math.max(1, parseInt(page)); // Ensure page is at least 1
+
+      const textCount = await Text.count({ projectId });
+      const skipCount = (pageNumber - 1) * DOCUMENT_LIMIT; // Calculate skip based on page number
+
+      const userAnnotations = await getUserAnnotations(projectId, skipCount);
+
+      const adjudicationData = userAnnotations.map((text) => {
+        let transformed = {
+          _id: text.id, // Copy the id to _id
+          input: text.sourceTokens, // Copy the sourceTokens directly
+          annotations: {},
+        };
+
+        // Iterate through the users in the replacements to structure the annotations
+        Object.keys(text.replacements).forEach((user) => {
+          transformed.annotations[user] = {
+            tags: text.tags[user] ? text.tags[user][1] : [], // Second element of tags array or an empty array if not exist
+            tokens: text.replacements[user], // Use the tokens from replacements
+            flags: text.flags[user] || [], // Copy flags, default to an empty array if not exist
+          };
+        });
+
+        // GET IAA
+        const [iaaScore, pairwiseScores, tokenAverages] = documentLevelIAA(
+          transformed.annotations
+        );
+
+        const compiledTokens = compileTokens(transformed.annotations);
+
+        transformed = {
+          ...transformed,
+          compiled: { tokens: compiledTokens },
+          scores: {
+            doc: iaaScore,
+            pairwise: pairwiseScores,
+            tokens: tokenAverages,
+          },
+        };
+
+        return transformed;
+      });
+
+      res.json({ data: adjudicationData[0] || {}, count: textCount });
+    } catch (error) {
+      console.error("Error fetching adjudication data:", error); // Log or handle error as needed
+      res.status(500).json({
+        message: "Failed to get adjudication data",
+        error: error.message,
+      });
+    }
+  }
+);
