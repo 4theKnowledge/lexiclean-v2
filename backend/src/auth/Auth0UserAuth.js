@@ -19,17 +19,22 @@ export class Auth0UserAuth extends IUserAuth {
         }
       );
 
-      const newUser = new User({
-        username: auth0UserDetails.username
-          ? auth0UserDetails.username.toLowerCase()
-          : "",
-        email: auth0UserDetails.email,
-        name: auth0UserDetails.nickname,
-        authId: auth0UserDetails.user_id,
-      });
+      console.log("creating new user in db");
+      try {
+        const newUser = new User({
+          username: auth0UserDetails.username
+            ? auth0UserDetails.username.toLowerCase()
+            : "",
+          email: auth0UserDetails.email,
+          name: auth0UserDetails.nickname,
+          authId: auth0UserDetails.user_id,
+        });
 
-      const savedUser = await newUser.save();
-      user = savedUser;
+        const savedUser = await newUser.save();
+        user = savedUser;
+      } catch (error) {
+        console.log(error);
+      }
     }
 
     return user._id;
