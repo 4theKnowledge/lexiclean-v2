@@ -1,9 +1,10 @@
-import { useAuth0 } from "@auth0/auth0-react";
 import axiosInstance from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
+import { getAuthServiceStrategy } from "../auth/AuthServiceConfig";
 
 const useApi = () => {
-  const { getAccessTokenSilently } = useAuth0();
+  const useAuthStrategy = getAuthServiceStrategy();
+  const { getAccessTokenSilently } = useAuthStrategy();
   const navigate = useNavigate();
 
   const callApi = async (url, options = {}) => {
