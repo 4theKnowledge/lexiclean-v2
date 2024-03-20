@@ -1,5 +1,16 @@
 import { format, createLogger, transports } from "winston";
+import path from "path";
 const { timestamp, combine, errors, json } = format;
+
+// Initialize the transports array with the console transport
+const loggerTransports = [new transports.Console()];
+
+// Only add the file transport in development environment
+if (process.env.NODE_ENV === "development") {
+  loggerTransports.push(
+    new transports.File({ filename: path.join(__dirname, "logs.json") })
+  );
+}
 
 const logger = createLogger({
   format: combine(
@@ -7,11 +18,7 @@ const logger = createLogger({
     errors({ stack: true }),
     json()
   ),
-  // defaultMeta: { service: 'user-service' },
-  transports: [
-    new transports.Console(),
-    new transports.File({ filename: "./logger/logs.json" }),
-  ],
+  transports: loggerTransports,
 });
 
 export default logger;
