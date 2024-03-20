@@ -44,6 +44,25 @@ const useDashboardActions = () => {
     }
   };
 
+  const downloadReplacementData = async (id) => {
+    try {
+      const data = await callApi(`/api/project/download/${id}/replacements`, {
+        method: "GET",
+      });
+
+      return data;
+    } catch (error) {
+      console.error(`Error downloading project replacements: ${error}`);
+      snackbarDispatch({
+        type: "SHOW",
+        message: `Error downloading project replacements`,
+        severity: "error",
+      });
+
+      throw error;
+    }
+  };
+
   const deleteProjectById = async (id) => {
     try {
       const data = await callApi(`/api/project/${id}`, {
@@ -180,6 +199,7 @@ const useDashboardActions = () => {
     updateProjectFlags,
     removeAnnotator,
     getAdjudication,
+    downloadReplacementData,
   };
 };
 

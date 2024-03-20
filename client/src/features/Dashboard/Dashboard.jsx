@@ -38,6 +38,7 @@ const Dashboard = () => {
     updateProjectSchema,
     updateProjectDetail,
     updateProjectFlags,
+    downloadReplacementData,
   } = useDashboardActions();
 
   useEffect(() => {
@@ -57,8 +58,13 @@ const Dashboard = () => {
   }, [projectId]);
 
   const downloadProject = async () => {
-    const data = await downloadProjectData(projectId);
-    downloadFile({ data: data, name: `${data.metadata.name}-annotations` });
+    const content = await downloadProjectData(projectId);
+    downloadFile({ data: content, name: `${data.details.name}-annotations` });
+  };
+
+  const downloadReplacements = async () => {
+    const content = await downloadReplacementData(projectId);
+    downloadFile({ data: content, name: `${data.details.name}-replacements` });
   };
 
   const deleteProject = async () => {
@@ -229,6 +235,7 @@ const Dashboard = () => {
             loading={loading}
             data={data}
             downloadProject={downloadProject}
+            downloadReplacements={downloadReplacements}
             deleteProject={deleteProject}
             disabled={disabled}
           />

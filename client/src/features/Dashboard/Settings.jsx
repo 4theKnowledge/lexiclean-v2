@@ -6,6 +6,7 @@ const Settings = ({
   loading,
   data,
   downloadProject,
+  downloadReplacements,
   deleteProject,
   disabled = false,
 }) => {
@@ -25,12 +26,35 @@ const Settings = ({
               Download Dataset
             </Typography>
             <Typography variant="caption">
-              Click to download this projects data as a JSON file.
+              Click to download this projects annotation data as a JSON file.
             </Typography>
           </Box>
           <Button
             variant="outlined"
             onClick={downloadProject}
+            disabled={loading}
+          >
+            Download
+          </Button>
+        </Box>
+        <Box
+          display="flex"
+          justifyContent="space-between"
+          mb={4}
+          alignItems="center"
+        >
+          <Box>
+            <Typography fontWeight="bold" color="text.secondary">
+              Download Replacements
+            </Typography>
+            <Typography variant="caption">
+              Click to download this projects replacements as a JSON file.
+              Replacement freqencies are counted across all annotators.
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            onClick={downloadReplacements}
             disabled={loading}
           >
             Download
