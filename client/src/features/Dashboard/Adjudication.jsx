@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import StyledCard from "./StyledCard";
 import {
   Chip,
@@ -137,147 +137,215 @@ const AnnotationGrid = ({
   showFlags,
   maxTokenSizes,
 }) => {
+  console.log(filteredData);
+
   return (
     <>
-      <TextContainer
-        title="Input"
-        tokens={filteredData.input}
-        maxTokenSizes={maxTokenSizes}
-      />
-      <Divider />
-      {Object.keys(filteredData.annotations).map((user) => {
-        return (
-          <TextContainer
-            title={user}
-            tokens={filteredData.annotations[user].tokens}
-            tags={filteredData.annotations[user].tags}
-            flags={filteredData.annotations[user].flags}
-            showTags={showTags}
-            showFlags={showFlags}
-            maxTokenSizes={maxTokenSizes}
-            showAvatar={true}
-          />
-        );
-      })}
-      <Divider />
-      <TextContainer
-        title="Compiled"
-        tokens={filteredData.compiled.tokens}
-        showTags={showTags}
-        showFlags={showFlags}
-        tokenScores={filteredData.scores.tokens}
-        maxTokenSizes={maxTokenSizes}
-      />
+      <Grid container spacing={1}>
+        {/* User Cells Column */}
+        <Grid item xs={2}>
+          <React.Fragment key={"input"}>
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="flex-end"
+              sx={{ height: 64 }}
+            >
+              <UserCell title={"Input"} />
+            </Box>
+          </React.Fragment>
+
+          {Object.keys(filteredData.annotations).map((user, index) => (
+            <React.Fragment key={index}>
+              <Divider />
+              <Box
+                display="flex"
+                alignItems="center"
+                justifyContent="flex-end"
+                sx={{ height: 64 }}
+              >
+                <UserCell
+                  title={user}
+                  flags={filteredData.annotations[user].flags}
+                  showFlags={showFlags}
+                />
+              </Box>
+            </React.Fragment>
+          ))}
+          <React.Fragment key={"output"}>
+            <Divider />
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="flex-end"
+              sx={{ height: 64 }}
+            >
+              <UserCell title={"Output"} />
+            </Box>
+          </React.Fragment>
+        </Grid>
+        {/* Annotation Cells Column */}
+        <Grid item xs={10} sx={{ width: "100%", overflowX: "auto" }}>
+          <React.Fragment key={"annotation-cell-input"}>
+            <Divider />
+            <Box
+              display="flex"
+              alignItems="center"
+              sx={{
+                height: 64,
+              }}
+            >
+              <AnnotationCell
+                key={"annotation-cell-input"}
+                tokens={filteredData.input}
+                maxTokenSizes={maxTokenSizes}
+              />
+            </Box>
+          </React.Fragment>
+
+          {Object.keys(filteredData.annotations).map((user, index) => (
+            <React.Fragment key={`annotation-cell-${index}`}>
+              <Divider />
+              <Box
+                display="flex"
+                alignItems="center"
+                sx={{
+                  height: 64,
+                }}
+              >
+                <AnnotationCell
+                  key={`annotation-cell-${index}`}
+                  tokens={filteredData.annotations[user].tokens}
+                  tags={filteredData.annotations[user].tags}
+                  showTags={showTags}
+                  maxTokenSizes={maxTokenSizes}
+                />
+              </Box>
+            </React.Fragment>
+          ))}
+          <React.Fragment key={"annotation-cell-compiled"}>
+            <Divider />
+            <Box
+              display="flex"
+              alignItems="center"
+              sx={{
+                height: 64,
+              }}
+            >
+              <AnnotationCell
+                key={"annotation-cell-compiled"}
+                tokens={filteredData.compiled.tokens}
+                showTags={showTags}
+                tokenScores={filteredData.scores.tokens}
+                maxTokenSizes={maxTokenSizes}
+              />
+            </Box>
+          </React.Fragment>
+        </Grid>
+      </Grid>
     </>
   );
 };
 
-const TextContainer = ({
+const UserCell = ({
   title,
+  flags = [],
+  showFlags = false,
+  showAvatar = false,
+}) => {
+  return (
+    <React.Fragment key={`user-cell-${title}`}>
+      <Stack direction="row" alignItems="center" spacing={1}>
+        <Typography gutterBottom>{title}</Typography>
+      </Stack>
+      {showFlags && (
+        <Stack direction="row" spacing={1}>
+          {flags.map((flag) => (
+            <Chip label={flag} size="small" />
+          ))}
+        </Stack>
+      )}
+    </React.Fragment>
+  );
+};
+
+const AnnotationCell = ({
   tokens,
   tags = [],
-  flags = [],
   showTags,
-  showFlags,
   tokenScores = [],
   maxTokenSizes,
-  showAvatar = false,
 }) => {
   const theme = useTheme();
 
   return (
-    <Grid container alignItems="center" p={1}>
-      <Grid item xs={2} justifyContent="right" display="flex" pr={4}>
-        <Stack direction="row" alignItems="center" spacing={1}>
-          {/* {showAvatar && (
-            <Avatar sx={{ width: 24, height: 24 }}>
-              {title[0].toUpperCase()}
-            </Avatar>
-          )} */}
-          <Typography gutterBottom>{title}</Typography>
-        </Stack>
-        {showFlags && (
-          <Stack direction="row" spacing={1}>
-            {flags.map((flag) => (
-              <Chip label={flag} size="small" />
-            ))}
-          </Stack>
-        )}
-      </Grid>
-      <Grid item xs={10}>
-        <Stack direction="row" spacing={1}>
-          {tokens.map((token, index) => {
-            const tokenTags = tags.slice(index, index + 1);
-            const hasTags = tokenTags.length > 0;
+    <Stack direction="row" spacing={1}>
+      {tokens.map((token, index) => {
+        const tokenTags = tags.slice(index, index + 1);
+        const hasTags = tokenTags.length > 0;
 
-            const tokenIAA = Math.round(tokenScores.slice(index, index + 1));
-            const tokenIAABgColor = getColor(tokenIAA);
-            const tokenIAATextColor = getContrastYIQ(tokenIAABgColor);
+        const tokenIAA = Math.round(tokenScores.slice(index, index + 1));
+        const tokenIAABgColor = getColor(tokenIAA);
+        const tokenIAATextColor = getContrastYIQ(tokenIAABgColor);
 
-            return (
-              <Stack
-                direction="column"
-                spacing={0.5}
-                sx={{ textAlign: "center" }}
+        return (
+          <Stack direction="column" spacing={0.5} sx={{ textAlign: "center" }}>
+            <Box
+              sx={{
+                border: "1px solid lightgrey",
+                borderRadius: 1,
+                textAlign: "center",
+              }}
+            >
+              <Box
+                sx={{
+                  border: tokenIAA ? 1 : 0,
+                  borderColor: "lightgrey",
+                  borderStyle: "solid",
+                  borderTopLeftRadius: 1,
+                  borderTopRightRadius: 1,
+                  backgroundColor: tokenIAABgColor,
+                  color: tokenIAATextColor,
+                }}
               >
-                <Box
-                  sx={{
-                    border: "1px solid lightgrey",
-                    borderRadius: 1,
-                    textAlign: "center",
-                  }}
-                >
-                  <Box
-                    sx={{
-                      border: tokenIAA ? 1 : 0,
-                      borderColor: "lightgrey",
-                      borderStyle: "solid",
-                      borderTopLeftRadius: 1,
-                      borderTopRightRadius: 1,
-                      backgroundColor: tokenIAABgColor,
-                      color: tokenIAATextColor,
-                    }}
+                {tokenScores.length > 0 && (
+                  <Tooltip
+                    placement="top"
+                    arrow
+                    title={`This token has an average IAA of ${tokenIAA}`}
                   >
-                    {tokenScores.length > 0 && (
-                      <Tooltip
-                        placement="top"
-                        arrow
-                        title={`This token has an average IAA of ${tokenIAA}`}
-                      >
-                        <Typography fontSize={10} sx={{ cursor: "help" }}>
-                          {tokenIAA}
-                        </Typography>
-                      </Tooltip>
-                    )}
-                  </Box>
-                  <Box
-                    p={0.5}
-                    sx={{
-                      width: `${maxTokenSizes[index] + 1 || 0}ch`,
-                      minWidth: "4ch",
-                      height: 32,
-                      backgroundColor:
-                        token === "" && alpha(theme.palette.token.empty, 0.5),
-                      borderBottomRightRadius: 1,
-                      borderBottomLeftRadius: 1,
-                    }}
-                  >
-                    <Typography sx={{ fontFamily: "monospace" }}>
-                      {token}
+                    <Typography fontSize={10} sx={{ cursor: "help" }}>
+                      {tokenIAA}
                     </Typography>
-                  </Box>
-                </Box>
-                {showTags && hasTags
-                  ? tokenTags.map((t) => (
-                      <Typography variant="caption">{t}</Typography>
-                    ))
-                  : null}
-              </Stack>
-            );
-          })}
-        </Stack>
-      </Grid>
-    </Grid>
+                  </Tooltip>
+                )}
+              </Box>
+              <Box
+                p={0.5}
+                sx={{
+                  width: `${maxTokenSizes[index] + 1 || 0}ch`,
+                  minWidth: "4ch",
+                  height: 32,
+                  backgroundColor:
+                    token === "" && alpha(theme.palette.token.empty, 0.5),
+                  borderBottomRightRadius: 1,
+                  borderBottomLeftRadius: 1,
+                }}
+              >
+                <Typography sx={{ fontFamily: "monospace" }}>
+                  {token}
+                </Typography>
+              </Box>
+            </Box>
+            {showTags && hasTags
+              ? tokenTags.map((t) => (
+                  <Typography variant="caption">{t}</Typography>
+                ))
+              : null}
+          </Stack>
+        );
+      })}
+    </Stack>
   );
 };
 
