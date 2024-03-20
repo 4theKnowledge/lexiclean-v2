@@ -1,7 +1,7 @@
 // This context will manage the user, their preferences, notifications, etc.
 import React, { createContext, useContext, useEffect, useReducer } from "react";
 import axiosInstance from "../api/axiosInstance";
-import { useAuth0 } from "@auth0/auth0-react";
+import { getAuthServiceStrategy } from "../auth/AuthServiceConfig";
 
 // Initial state
 const initialState = {
@@ -35,66 +35,28 @@ function appReducer(state, action) {
 // Context provider component
 export function AppProvider({ children }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
-  const {
-    isAuthenticated,
-    user: auth0User,
-    getAccessTokenSilently,
-  } = useAuth0();
 
-  // useEffect(() => {
-  //   if (isAuthenticated && auth0User) {
-  //     // Fetch additional user data based on Auth0 user information
-  //     async function fetchUserData() {
-  //       try {
-  //         const auth0Token = await getAccessTokenSilently({
-  //           authorizationParams: {
-  //             audience: `https://${process.env.REACT_APP_AUTH0_AUDIENCE}`,
-  //           },
-  //         });
-  //         dispatch({ type: "SET_TOKEN", payload: auth0Token });
-
-  //         const response = await axiosInstance.get("/api/user/", {
-  //           headers: {
-  //             Authorization: `Bearer ${auth0Token}`,
-  //           },
-  //         });
-
-  //         if (response.status !== 200) {
-  //           throw new Error("Failed to fetch user data");
-  //         }
-  //         const userData = await response.data;
-  //         dispatch({ type: "SET_USER", payload: userData });
-  //       } catch (error) {
-  //         console.error("Error fetching user data:", error);
-  //       }
-  //     }
-  //     fetchUserData();
-  //   } else {
-  //     // Handle logout
-  //     dispatch({ type: "LOGOUT_USER" });
-  //   }
-  // }, [isAuthenticated, auth0User]); // Depend on Auth0's authentication state.
+  // Get auth service strategy hook
+  const useAuthStrategy = getAuthServiceStrategy();
+  const { isAuthenticated, user, getAccessTokenSilently, authorizationParams } =
+    useAuthStrategy();
 
   useEffect(() => {
-    if (isAuthenticated && auth0User) {
+    if (isAuthenticated && user) {
       const initializeApp = async () => {
         try {
-          const auth0Token = await getAccessTokenSilently({
-            authorizationParams: {
-              audience: `https://${process.env.REACT_APP_AUTH0_AUDIENCE}`,
-            },
-          });
-          dispatch({ type: "SET_TOKEN", payload: auth0Token });
+          const token = await getAccessTokenSilently({ authorizationParams });
+          dispatch({ type: "SET_TOKEN", payload: token });
 
           const [userDataResponse, notificationsResponse] = await Promise.all([
             axiosInstance.get("/api/user/", {
               headers: {
-                Authorization: `Bearer ${auth0Token}`,
+                Authorization: `Bearer ${token}`,
               },
             }),
             axiosInstance.get("/api/notification", {
               headers: {
-                Authorization: `Bearer ${auth0Token}`,
+                Authorization: `Bearer ${token}`,
               },
             }),
           ]);
@@ -122,7 +84,7 @@ export function AppProvider({ children }) {
       // console.log("logging out..."); // TODO review why this is happening.
       dispatch({ type: "LOGOUT_USER" });
     }
-  }, [isAuthenticated, auth0User]);
+  }, [isAuthenticated, user]);
 
   useEffect(() => {
     let pollingInterval = null;
