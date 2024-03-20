@@ -13,7 +13,7 @@ import UndoIcon from "@mui/icons-material/Undo";
 import RestoreIcon from "@mui/icons-material/Restore";
 import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
 import { ProjectContext } from "../../shared/context/ProjectContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import { useTheme } from "@mui/material/styles";
 import useAnnotationActions from "../../shared/hooks/api/annotation";
@@ -33,7 +33,6 @@ const EditPopover = ({
   const [state, dispatch] = useContext(ProjectContext);
   const navigate = useNavigate();
   const [showExtraOptions, setShowExtraOptions] = useState(false);
-  const [quickFilterApplied, setQuickFilterApplied] = useState(false);
   const theme = useTheme();
   const {
     applyTokenTransformAction,
@@ -42,6 +41,7 @@ const EditPopover = ({
     splitTokenAction,
     removeTokenAction,
   } = useAnnotationActions();
+  const { projectId } = useParams();
 
   const tokenIsEmpty = currentValue === "";
 
@@ -128,25 +128,21 @@ const EditPopover = ({
   };
 
   const handleQuickFilter = () => {
-    // Set filter and trigger reload of texts...
     dispatch({
       type: "SET_VALUE",
       payload: {
         filters: {
           ...state.filters,
-          searchTerm: quickFilterApplied ? "" : state.selectedTokenValue,
+          searchTerm: currentValue,
         },
       },
     });
     dispatch({ type: "SET_PAGE", payload: 1 });
-    navigate(`/project/${state.projectId}/page=1`);
-    setQuickFilterApplied(!quickFilterApplied);
+    const encodedSearchTerm = encodeURIComponent(currentValue);
+    navigate(`/project/${projectId}?page=1&searchTerm=${encodedSearchTerm}`, {
+      replace: true,
+    });
   };
-
-  useEffect(() => {
-    // Allows user to jump between selections
-    setQuickFilterApplied(false);
-  }, [state.selectedTokenValue]);
 
   const showOperations = editing || hasReplacement || hasSuggestion;
   const showSplitTokenOperation = /\s/.test(currentValue);
@@ -266,11 +262,11 @@ const EditPopover = ({
         {!tokenIsEmpty && (showExtraOptions || !showOperations) ? (
           <>
             {showOperations && <Divider orientation="vertical" />}
-            {/* <Tooltip title="Click to perform a quick filter on this token">
+            <Tooltip title="Click to perform a quick filter on this token">
               <IconButton size="small" onClick={handleQuickFilter}>
                 <FilterListIcon size="small" sx={{ fontSize: "1rem" }} />
               </IconButton>
-            </Tooltip> */}
+            </Tooltip>
             {showSplitTokenOperation && (
               <Tooltip title="Click to split token">
                 <IconButton size="small" onClick={handleSplitAction}>
