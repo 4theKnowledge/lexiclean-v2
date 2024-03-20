@@ -1,13 +1,17 @@
 import * as React from "react";
 import { updateTextTokenTags, updateTexts } from "../utils/project-context";
 
-const initialState = {
+export const initialState = {
   filters: {
     searchTerm: "",
-    referenceSearchTerm: "",
     saved: "all",
-    candidates: "all",
     rank: 1,
+    flags: "all",
+    // referenceSearchTerm: "",
+    // candidates: "all",
+    // quality: "all",
+    externalIds: "",
+    // deletedTokens: "all" // TODO: Future filter.
   },
   savePending: false,
   projectLoading: true,
@@ -194,6 +198,9 @@ const reducer = (state, action) => {
     case "ADD_FLAG": {
       const { textId, flagId } = action.payload;
       const updatedState = { ...state };
+
+      console.log("flags: ", updatedState.texts[textId].flags);
+
       updatedState.texts[textId].flags.push(flagId);
       return updatedState;
     }
@@ -205,9 +212,12 @@ const reducer = (state, action) => {
       ].flags.filter((f) => f !== flagId);
       return updatedState;
     }
-
-    case "SET_SHOW_TOAST": {
-      return { ...state, showToast: action.payload };
+    case "SET_FILTERS": {
+      return {
+        ...state,
+        filters: { ...state.filters, ...action.payload },
+        textsLoading: true, // Optionally reset textsLoading to indicate loading new filtered data
+      };
     }
     default: {
       throw new Error(`Unhandled action type: ${action.type}`);
