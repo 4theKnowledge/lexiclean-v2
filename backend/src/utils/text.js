@@ -85,8 +85,8 @@ export const filterTextsBySearchTerm = async ({
 
     // Combine and deduplicate text IDs from both sources
     const combinedTextIds = [
-      ...textsSearchTermOriginal.map((t) => t._id),
-      ...annotationsSearchReplacement.map((a) => a.textId),
+      ...textsSearchTermOriginal.map((t) => t._id.toString()),
+      ...annotationsSearchReplacement.map((a) => a.textId.toString()),
     ];
 
     return [...new Set(combinedTextIds)];
