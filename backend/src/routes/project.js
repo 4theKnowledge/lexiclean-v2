@@ -27,6 +27,11 @@ import {
   documentLevelIAA,
   getUserAnnotations,
 } from "../services/project.js";
+import fs from "fs/promises";
+import path from "path";
+
+const appRoot = process.env.APP_ROOT || ".";
+const lexiconPath = path.join(appRoot, "src", "data", "en_lexicon.json");
 
 const router = express.Router();
 const REPLACEMENT_COLOR = "#03a9f4";
@@ -81,6 +86,29 @@ router.post("/create", async (req, res) => {
      * create map sets used for pre-annotation of tokens
      */
     let enMap = await Resource.findOne({ type: "en" });
+
+    if (!enMap) {
+      console.log("English lexicon not available...");
+      // Insert into db
+      try {
+        const rawData = await fs.readFile(lexiconPath, "utf8");
+        const docs = JSON.parse(rawData);
+        // Assuming docs[0] has a 'type' property you want to check
+        if (docs[0] && docs[0].type === "en") {
+          const lexiconResult = await Resource.create(docs[0]);
+          console.log(`Lexicon added with _id: ${lexiconResult.insertedId}`);
+
+          enMap = await Resource.findOne({ type: "en" });
+        } else {
+          console.log("No 'en' type lexicon found in the provided file.");
+        }
+      } catch (error) {
+        console.error("Failed to read or insert lexicon data:", error);
+      }
+    } else {
+      console.log("An 'en' type lexicon entry already exists in the database.");
+    }
+
     console.log(enMap._id);
     const enMapId = enMap._id;
     console.log(`loaded en map with ${enMap.tokens.length} tokens`);
