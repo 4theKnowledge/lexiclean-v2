@@ -20,13 +20,23 @@ const app = express();
 // Create rate limit rule
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // limit each IP to 100 requests per windowMs
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
 });
 
 // Apply the rate limiting middleware to all requests
 app.use(apiLimiter);
+// Simple health check
+app.get("/health", (req, res) => {
+  res.status(200).send("OK");
+});
+
+// Middleware
+app.use(cors());
+app.use(express.urlencoded({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
 
 if (process.env.AUTH_STRATEGY === "AUTH0") {
   const checkJwt = auth({
@@ -36,17 +46,6 @@ if (process.env.AUTH_STRATEGY === "AUTH0") {
   // Applying JWT check globally
   app.use(checkJwt);
 }
-
-// Middleware
-app.use(cors());
-app.use(express.urlencoded({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true }));
-app.use(express.json({ limit: "50mb" }));
-
-// Simple health check
-app.get("/health", (req, res) => {
-  res.status(200).send("OK");
-});
 
 // Custom middleware
 app.use(authenticateUser);
