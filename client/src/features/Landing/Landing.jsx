@@ -6,15 +6,16 @@ import {
   Container,
   Box,
 } from "@mui/material";
-import { useAuth0 } from "@auth0/auth0-react";
 import { Link } from "react-router-dom";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import GitHubIcon from "@mui/icons-material/GitHub";
 import BubbleChartIcon from "@mui/icons-material/BubbleChart";
 import ThemeToggleButton from "../../shared/components/Layout/ThemeToggleButton";
+import { getAuthServiceStrategy } from "../../shared/auth/AuthServiceConfig";
 
 const Landing = () => {
-  const { isAuthenticated, loginWithRedirect, logout } = useAuth0();
+  const useAuthStrategy = getAuthServiceStrategy();
+  const { isAuthenticated, login, logout } = useAuthStrategy();
 
   return (
     <Box sx={{ backgroundColor: "background.light", height: "100vh" }}>
@@ -41,7 +42,7 @@ const Landing = () => {
               onClick={
                 isAuthenticated
                   ? () => logout({ returnTo: window.location.origin })
-                  : loginWithRedirect
+                  : login
               }
             >
               {isAuthenticated ? "Logout" : "Login"}
@@ -56,7 +57,8 @@ const Landing = () => {
 };
 
 const ActionButton = ({ size = "medium" }) => {
-  const { isAuthenticated, loginWithRedirect } = useAuth0();
+  const useAuthStrategy = getAuthServiceStrategy();
+  const { isAuthenticated, login } = useAuthStrategy();
 
   return isAuthenticated ? (
     <Button
@@ -70,12 +72,7 @@ const ActionButton = ({ size = "medium" }) => {
       Enter
     </Button>
   ) : (
-    <Button
-      variant="contained"
-      size={size}
-      disableElevation
-      onClick={loginWithRedirect}
-    >
+    <Button variant="contained" size={size} disableElevation onClick={login}>
       Get Started
     </Button>
   );
