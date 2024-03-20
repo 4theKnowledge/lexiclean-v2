@@ -1,10 +1,11 @@
 import { Button, IconButton, Tooltip } from "@mui/material";
 import LogoutIcon from "@mui/icons-material/Logout";
 import LoginIcon from "@mui/icons-material/Login";
-import { useAuth0 } from "@auth0/auth0-react";
+import { getAuthServiceStrategy } from "../../auth/AuthServiceConfig";
 
 const LogoutButton = ({ drawerOpen = true }) => {
-  const { isAuthenticated, loginWithRedirect, logout } = useAuth0();
+  const useAuthStrategy = getAuthServiceStrategy();
+  const { isAuthenticated, loginWithRedirect, logout } = useAuthStrategy();
 
   if (drawerOpen) {
     return (
