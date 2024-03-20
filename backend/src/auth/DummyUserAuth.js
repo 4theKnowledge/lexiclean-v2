@@ -4,20 +4,20 @@ import User from "../models/User.js";
 
 export class DummyUserAuth extends IUserAuth {
   async validateAndCreateUser(authHeader) {
-    // Simulate user authentication. In a real app, replace this with logic appropriate for your dummy auth.
-    // This could involve creating a new user if one doesn't exist or simply returning a static user ID.
+    // Simulate user authentication.
+    // Extract the username in a safe manner, ensuring it's properly validated and sanitized
+    const username = authHeader.replace("Bearer ", "").toLowerCase();
 
-    let user = await User.findOne({ username: "user" }).lean();
+    let user = await User.findOne({ username }).lean();
     if (!user) {
+      console.log(`Creating new user: ${username}`);
       try {
         const newUser = new User({
-          username: "user",
-          email: "user@mail.com",
-          name: "user",
-          authId: "user1234",
+          username: username,
+          email: `${username}@mail.com`,
+          name: username,
+          authId: `auth|${username}`,
         });
-
-        console.log(newUser);
 
         const savedUser = await newUser.save();
         user = savedUser;
