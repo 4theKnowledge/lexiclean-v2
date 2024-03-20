@@ -133,7 +133,7 @@ const ActionTray = ({ textId, textIndex }) => {
             onClick={() => handleSave(textId, !state.texts[textId].saved)}
           />
         </Tooltip>
-        <Tooltip
+        {/* <Tooltip
           title={
             "Concatenation is currently unavailable"
             // state.tokenizeTextId === textId
@@ -159,7 +159,7 @@ const ActionTray = ({ textId, textIndex }) => {
               onClick={handleTokenizeText}
             />
           </span>
-        </Tooltip>
+        </Tooltip> */}
         <TrayFlagChip textId={textId} />
         <Divider orientation="vertical" flexItem />
         <Tooltip title="Click to get AI suggestion" placement="top">
@@ -249,12 +249,8 @@ const TrayFlagChip = ({ textId }) => {
     const flagId = state.project.flags[flagIndex]._id;
 
     if (state.texts[textId].flags.includes(flagId)) {
-      // if flag exists, delete
-      // console.log("flag exists");
       await deleteFlag({ textId, flagId });
     } else {
-      // if flag doesn't exist, add
-      // console.log("flag not exist");
       await addFlag({ textId, flagId });
     }
   };
