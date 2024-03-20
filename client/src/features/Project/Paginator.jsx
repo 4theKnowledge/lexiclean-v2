@@ -23,7 +23,7 @@ const Paginator = () => {
       width="100%"
       p={1}
     >
-      {!state.totalTexts ? (
+      {state.totalTexts === 0 ? null : !state.totalTexts ? (
         <Skeleton variant="rectangular" width={300} height={40} />
       ) : Object.keys(state.texts).length === 0 ? null : (
         <Pagination
