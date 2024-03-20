@@ -7,7 +7,6 @@ import {
   // CircularProgress,
   Button,
   Tooltip,
-  Chip,
 } from "@mui/material";
 import MuiAppBar from "@mui/material/AppBar";
 import { ProjectContext } from "../../shared/context/ProjectContext";
@@ -64,7 +63,7 @@ const ProjectAppBar = () => {
         </Typography>
         <Stack direction="row" spacing={2} alignItems="center">
           {/* {state.submitting && <CircularProgress size={18} />} */}
-          {/* <FilterButton /> */}
+          <FilterButton />
           <ThemeToggleButton />
         </Stack>
       </Toolbar>
@@ -74,43 +73,19 @@ const ProjectAppBar = () => {
 };
 
 const FilterButton = () => {
+  const [state, dispatch] = useContext(ProjectContext);
   return (
     <Tooltip title="Toggle annotation filters">
       <Button
-        // disabled
         variant="outlined"
-        // onClick={() =>
-        //   dispatch({
-        //     type: "SET_VALUE",
-        //     payload: { showFilterModal: true },
-        //   })
-        // }
+        onClick={() =>
+          dispatch({
+            type: "SET_VALUE",
+            payload: { showFilterModal: true },
+          })
+        }
         sx={{ backgroundColor: "background.default" }}
-        startIcon={
-          <FilterListIcon
-          // sx={{ color: theme.palette.primary.main }}
-          />
-        }
-        endIcon={
-          <Chip
-            label={
-              <Typography
-                fontSize={12}
-                fontWeight={500}
-                sx={{
-                  textTransform: "capitalize",
-                  cursor: "pointer",
-                }}
-              >
-                Ctrl + F
-              </Typography>
-            }
-            variant="outlined"
-            sx={{ height: "22px" }}
-            size="small"
-            // disabled
-          />
-        }
+        startIcon={<FilterListIcon />}
       >
         Filters
       </Button>
