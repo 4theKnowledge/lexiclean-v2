@@ -151,9 +151,21 @@ export const compileTokens = (annotations) => {
 
 /**
  * Aligns annotations made by users to the texts they are raised against.
- * This is useful for IAA calculation and downloads.
+ * This is useful for IAA calculation and downloads. The function allows
+ * optional skipping of a specified number of texts at the beginning of
+ * the text list, which can be useful for pagination or selective processing.
+ *
+ * @param {String} projectId - The ID of the project to fetch annotations for.
+ * @param {Number} [skipCount=null] - Optional. The number of text entries to skip
+ *                                    at the beginning of the list. If null or not
+ *                                    provided, no texts are skipped, and the first
+ *                                    text's annotations are returned. When provided,
+ *                                    skips the specified number of texts and returns
+ *                                    the annotation for the next text.
+ * @returns {Promise<Array>} - A promise that resolves to an array of annotations
+ *                             aligned with their corresponding texts.
  */
-export const getUserAnnotations = async (projectId) => {
+export const getUserAnnotations = async (projectId, skipCount = null) => {
   const project = await Project.findById(
     {
       _id: projectId,
@@ -163,7 +175,11 @@ export const getUserAnnotations = async (projectId) => {
     .populate("annotators")
     .lean();
 
-  const textIds = project.texts;
+  // Apply the skipCount if provided, else default to using all textIds
+  const textIds =
+    skipCount !== null
+      ? project.texts.slice(skipCount, skipCount + 1)
+      : project.texts;
 
   const annotators = project.annotators;
   const annotatorIds = annotators.map((a) => a._id.toString());
