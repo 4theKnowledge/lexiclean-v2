@@ -400,8 +400,8 @@ const TagCreateUpdateUploadButtons = ({
   disabled = true,
 }) => {
   return (
-    <Box display="flex" justifyContent="space-between" mt={2}>
-      <Button
+    <Box display="flex" justifyContent="center" width="100%" mt={2}>
+      {/* <Button
         component="label"
         variant="contained"
         disabled={disabled}
@@ -410,7 +410,7 @@ const TagCreateUpdateUploadButtons = ({
         <Tooltip title="Click to upload a label file gazetteer">
           Upload label value gazetteer
         </Tooltip>
-      </Button>
+      </Button> */}
       {/* <Button
       component="label"
       variant="contained"
