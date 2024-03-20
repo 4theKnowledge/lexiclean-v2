@@ -16,6 +16,7 @@ router.get("/", async (req, res) => {
 });
 
 router.patch("/:userId", async (req, res) => {
+  // TODO: validate that this works with the Dummy auth configuration.
   try {
     // Extract userID from request parameters (this is the Auth0 `sub`)
     const userId = req.params.userId;
