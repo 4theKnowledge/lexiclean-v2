@@ -2,20 +2,15 @@ import express from "express";
 import logger from "../logger/index.js";
 import Text from "../models/Text.js";
 import Project from "../models/Project.js";
-import Resource from "../models/Resource.js";
 import Annotations from "../models/Annotations.js";
-import {
-  formatTextOutput,
-  filterTextsBySearchTerm,
-  processAnnotations,
-} from "../utils/text.js";
+import { filterTextsBySearchTerm, processAnnotations } from "../utils/text.js";
 import mongoose from "mongoose";
+import { safeObjectId } from "../utils/general.js";
 
 const router = express.Router();
 
 /**
  * Filters project texts for client pagination.
- * TODO: limit the texts based on the user being the `user` on the project or in the projects `annotators` array.
  */
 router.post("/filter", async (req, res) => {
   logger.info("Paginating texts.", {
@@ -25,14 +20,18 @@ router.post("/filter", async (req, res) => {
 
   try {
     const userId = req.userId;
+    let { projectId } = req.body;
+    let {
+      searchTerm = "",
+      saved = "all",
+      rank = 1,
+      referenceSearchTerm = "",
+      externalIds = "", // Comma-separated values
+      flags = "", // Currently a single flag is sent TODO: Support multiple flags.
+    } = req.body.filters;
 
     const skip = parseInt((req.query.page - 1) * req.query.limit);
     const limit = parseInt(req.query.limit);
-    const rank = req.body.filters.rank;
-
-    const saveState = req.body.filters.saved || "all";
-    const searchTerm = req.body.filters.searchTerm || "";
-    const referenceSearchTerm = req.body.filters.referenceSearchTerm || "";
     const hasReferenceSearchTerm = referenceSearchTerm !== "";
 
     // Find textIds from reference search term matches
@@ -58,40 +57,102 @@ router.post("/filter", async (req, res) => {
 
     // Get textIds associated with project
     const project = await Project.findOne(
-      { _id: req.body.projectId },
+      { _id: projectId },
       { texts: 1 }
     ).lean();
 
     const textIds = project.texts;
 
-    const textsMatchingSearchTerm = await filterTextsBySearchTerm({
-      projectId: req.body.projectId,
+    const textIdsMatchingSearchTerm = await filterTextsBySearchTerm({
+      projectId,
       userId,
       textIds,
       searchTerm: searchTerm,
     });
 
-    console.log("textsMatchingSearchTerm: ", textsMatchingSearchTerm);
-
-    // Find texts by _id and populate with Annotations etc.
-    // TODO: Handle save state... These should be found by themselves and used to filter out (or not) textId results.
+    console.log(
+      "textIdsMatchingSearchTerm: ",
+      textIdsMatchingSearchTerm.length
+    );
 
     const textSaveAnnotations = await Annotations.find({
       userId,
       textId: { $in: project.texts },
       type: "save",
     }).lean();
-    console.log("textSaveAnnotations: ", textSaveAnnotations);
+    // console.log("textSaveAnnotations: ", textSaveAnnotations);
 
-    let savedTextIds = textSaveAnnotations.map((a) => a.textId);
-    console.log("savedTextIds: ", savedTextIds);
+    let savedTextIds = textSaveAnnotations.map((a) => a.textId.toString());
+    // console.log("savedTextIds: ", savedTextIds.length);
+
+    let textIdsToMatch;
+
+    if (saved === "all") {
+      // If saved === 'all', use textIdsMatchingSearchTerm without modification
+      textIdsToMatch = textIdsMatchingSearchTerm;
+    } else if (saved === "true") {
+      // If saved === 'true', filter textIdsMatchingSearchTerm to include only those in savedTextIds
+      textIdsToMatch = textIdsMatchingSearchTerm.filter((textId) =>
+        savedTextIds.includes(textId)
+      );
+    } else if (saved === "false") {
+      // If saved === 'false', filter textIdsMatchingSearchTerm to exclude those in savedTextIds
+      textIdsToMatch = textIdsMatchingSearchTerm.filter(
+        (textId) => !savedTextIds.includes(textId)
+      );
+    }
+
+    // Check external ids on texts
+    if (externalIds !== "") {
+      // Split external ids into an array of values.
+      externalIds = externalIds.split(",").map((id) => id.trim());
+      // console.log("externalIds: ", externalIds);
+      const textExternalIdsMatches = await Text.find({
+        identifiers: { $in: externalIds },
+      }).lean();
+
+      // console.log("textExternalIdsMatches: ", textExternalIdsMatches);
+
+      const textsIdsWithExternalIdMatches = textExternalIdsMatches.map((t) =>
+        t._id.toString()
+      );
+
+      textIdsToMatch = textIdsToMatch.filter((textId) =>
+        textsIdsWithExternalIdMatches.includes(textId)
+      );
+    }
+
+    // Flags
+    if (flags !== "" && flags !== "all") {
+      // Split and trim each ID, and then safely convert to ObjectId
+      flags = flags
+        .split(",")
+        .map((id) => safeObjectId(id.trim()))
+        .filter((id) => id !== null);
+
+      console.log("flags: ", flags);
+
+      const flagAnnotations = await Annotations.find({
+        userId,
+        type: "flag",
+        value: { $in: flags },
+      });
+
+      const textIdsWithFlags = flagAnnotations.map((a) => a.textId.toString());
+
+      textIdsToMatch = textIdsToMatch.filter((textId) =>
+        textIdsWithFlags.includes(textId)
+      );
+    }
 
     let matchedTexts;
     try {
       matchedTexts = await Text.aggregate([
         {
           $match: {
-            _id: { $in: textsMatchingSearchTerm },
+            _id: {
+              $in: textIdsToMatch.map((id) => mongoose.Types.ObjectId(id)),
+            },
           },
         },
         {
@@ -121,30 +182,14 @@ router.post("/filter", async (req, res) => {
       console.log(error);
       matchedTexts = [];
     }
-    console.log(matchedTexts);
+    console.log("matchedTexts: ", matchedTexts.length);
 
     // Process annotations
     const processedTexts = processAnnotations(matchedTexts);
-
-    console.log("processedTexts: ", processedTexts);
+    console.log("processedTexts: ", processedTexts.length);
 
     // Total Texts are the ENTIRE set of matches, not just the set returned.
-    let totalTexts;
-    try {
-      totalTexts = await Text.count({
-        _id: { $in: textsMatchingSearchTerm },
-        // saved:
-        //   saveState === "all"
-        //     ? { $in: [true, false] }
-        //     : saveState === "yes"
-        //     ? true
-        //     : false,
-      });
-    } catch (error) {
-      console.log(error);
-    }
-
-    savedTextIds = savedTextIds.map((tId) => tId.toString());
+    const totalTexts = textIdsToMatch.length;
 
     const payload = Object.assign(
       {},
@@ -169,7 +214,7 @@ router.post("/filter", async (req, res) => {
     logger.error("Failed to get text pagination results", {
       route: `/api/text/filter/${req.body.projectId}`,
     });
-    res.status(500).send({ detail: error });
+    res.status(500).send({ message: error });
   }
 });
 
