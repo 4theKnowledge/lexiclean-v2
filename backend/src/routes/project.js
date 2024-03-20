@@ -758,6 +758,86 @@ router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
   }
 });
 
+router.get(
+  "/download/:projectId/replacements",
+  projectAccessCheck,
+  async (req, res) => {
+    try {
+      const { projectId } = req.params;
+
+      const project = await Project.findOne({ _id: projectId }, { texts: 1 });
+      const textIds = project.texts.map((id) => mongoose.Types.ObjectId(id));
+
+      // Get all replacements that are not suggestions
+      const annotations = await Annotations.find({
+        textId: { $in: textIds },
+        type: "replacement",
+        isSuggestion: false,
+      }).lean();
+
+      console.log("annotations: ", annotations);
+
+      let tokenReplacementCounts = {};
+      for (const annotation of annotations) {
+        const tokenIdStr = annotation.tokenId.toString();
+
+        if (tokenReplacementCounts[tokenIdStr]) {
+          tokenReplacementCounts[tokenIdStr].count += 1;
+        } else {
+          tokenReplacementCounts[tokenIdStr] = {
+            value: annotation.value,
+            count: 1,
+          };
+        }
+      }
+
+      console.log("tokenReplacementCounts: ", tokenReplacementCounts);
+
+      // Find all the respective texts
+      const annotatedTextIds = annotations.map((a) => a.textId);
+      console.log("annotatedTextIds: ", annotatedTextIds);
+
+      // Fetch texts
+      const texts = await Text.find({ _id: { $in: annotatedTextIds } }).lean();
+      // console.log(texts);
+
+      let replacements = {};
+      const tokenReplacementIds = Object.keys(tokenReplacementCounts);
+
+      for (const text of texts) {
+        for (const token of text.tokens) {
+          const tokenIdStr = token._id.toString();
+
+          if (tokenReplacementIds.includes(tokenIdStr)) {
+            const tokenValue = token.value;
+            const replacementEntry = tokenReplacementCounts[tokenIdStr];
+
+            // Check if the replacements object already has an entry for this token value
+            if (!replacements[tokenValue]) {
+              replacements[tokenValue] = [replacementEntry];
+            } else {
+              // Find if an entry with the same value already exists
+              let existingEntry = replacements[tokenValue].find(
+                (entry) => entry.value === replacementEntry.value
+              );
+
+              if (existingEntry) {
+                // If found, just update the count
+                existingEntry.count += replacementEntry.count;
+              } else {
+                // Otherwise, push the new entry
+                replacements[tokenValue].push(replacementEntry);
+              }
+            }
+          }
+        }
+      }
+
+      res.json(replacements);
+    } catch (error) {}
+  }
+);
+
 /**
  * Fetch project summary for client dashboard.
  */
@@ -1143,8 +1223,6 @@ router.patch("/annotator/remove", projectManagementCheck, async (req, res) => {
   } catch (error) {}
 });
 
-export default router;
-
 router.get(
   "/:projectId/adjudication/:page",
   projectAccessCheck,
@@ -1207,3 +1285,5 @@ router.get(
     }
   }
 );
+
+export default router;
