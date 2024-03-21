@@ -19,6 +19,7 @@ import { getColor, getContrastYIQ } from "../../shared/utils/dashboard";
 import { useTheme, alpha } from "@mui/material/styles";
 import useDashboardActions from "../../shared/hooks/api/dashboard";
 import { useParams } from "react-router-dom";
+import { grey } from "@mui/material/colors";
 
 const getMaxTokenSizes = (data) => {
   // Iterates over input tokens and annotations to find the max token widths for each token index
@@ -41,7 +42,7 @@ const getMaxTokenSizes = (data) => {
 };
 
 const Adjudication = () => {
-  const [showTags, setShowTags] = useState(false);
+  const [showTags, setShowTags] = useState(true);
   const [page, setPage] = useState(1);
   const [maxTokenSizes, setMaxTokenSizes] = useState([]);
   const { getAdjudication } = useDashboardActions();
@@ -80,15 +81,35 @@ const Adjudication = () => {
       <Box p={"0rem 0.5rem 1rem 0.5rem"}>
         <Alert severity="info">
           <AlertTitle>Project Adjudication Overview</AlertTitle>
-          Adjudication plays a pivotal role in the process of natural language
-          annotation, providing a platform to assess the consensus among
-          annotators. This feature allows you to peruse project texts,
-          inspecting annotations to discern consensus levels, identify areas
-          needing refinement, and recognise successfully aligned annotations.
-          Use the pagination controls to navigate through documents. The "input"
-          denotes the original text, while "compiled" indicates the
-          consensus-derived text. Use the toggle buttons to reveal or hide
-          annotator flags and tags for further insights.
+          <strong>Adjudication</strong> is essential in the natural language
+          annotation process, enabling a thorough evaluation of annotator
+          consensus. This feature provides the tools to:
+          <ul>
+            <li>Examine project texts and annotations.</li>
+            <li>
+              Analyse consensus levels and pinpoint areas for improvement.
+            </li>
+            <li>Identify well-aligned annotations.</li>
+          </ul>
+          Navigate documents using the pagination controls. Terms explained:
+          <ul>
+            <li>
+              <strong>Input:</strong> The original text.
+            </li>
+            <li>
+              <strong>Compiled:</strong> The consensus-derived text,
+              highlighting token-level agreement. A "changed" label under a
+              token signifies modification from the "input" based on majority
+              agreement.
+            </li>
+            <li>
+              User-applied flags are displayed beneath their usernames, offering
+              additional context.
+            </li>
+          </ul>
+          Use the tag toggle button to display or conceal annotator tags,
+          offering deeper insights into the adjudication process. These will
+          appear below user tokens.
         </Alert>
       </Box>
       {loading || !data ? (
@@ -290,19 +311,64 @@ const AnnotationCell = ({
                       minWidth: "4ch",
                       height: 32,
                       backgroundColor:
-                        token === "" && alpha(theme.palette.token.empty, 0.5),
+                        (token?.value ?? token) === "" &&
+                        alpha(theme.palette.token.empty, 0.5),
                       borderBottomRightRadius: 1,
                       borderBottomLeftRadius: 1,
                     }}
                   >
                     <Typography sx={{ fontFamily: "monospace" }}>
-                      {token}
+                      {token?.value ?? token}
                     </Typography>
                   </Box>
+                  {token.changed && (
+                    <Tooltip
+                      title="This token is different from the input due to majority agreement."
+                      placement="bottom"
+                      arrow
+                    >
+                      <Box
+                        sx={{
+                          height: 16,
+                          width: "100%",
+                          borderTop: "1px solid lightgrey",
+                          cursor: "help",
+                          backgroundColor: alpha(
+                            theme.palette.primary.main,
+                            0.25
+                          ),
+                        }}
+                      >
+                        <Typography fontSize={10}>changed</Typography>
+                      </Box>
+                    </Tooltip>
+                  )}
                 </Box>
                 {showTags && hasTags
                   ? tokenTags.map((t) => (
-                      <Typography variant="caption">{t}</Typography>
+                      <Tooltip
+                        title={`${title} added the label '${t}' to this token.`}
+                        arrow
+                        placement="bottom"
+                      >
+                        <Box
+                          sx={{
+                            backgroundColor: alpha(grey[100], 0.25),
+                            height: 20,
+                            userSelect: "none",
+                            cursor: "help",
+                            margin: "0 4px",
+                            border: "1px solid",
+                            borderRadius: "4px",
+                            borderColor: alpha(grey[500], 0.5),
+                          }}
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                        >
+                          <Typography sx={{ fontSize: 10 }}>{t}</Typography>
+                        </Box>
+                      </Tooltip>
                     ))
                   : null}
               </Stack>
