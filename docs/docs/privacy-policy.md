@@ -1,3 +1,8 @@
+---
+# sidebar_position:
+description: LexiClean's privacy policy
+---
+
 # Privacy Policy
 
 Last updated: _15th May 2024_
