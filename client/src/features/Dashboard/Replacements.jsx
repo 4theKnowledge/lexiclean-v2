@@ -1,17 +1,18 @@
 // View only component
-import { Chip, Stack, Tooltip } from "@mui/material";
+import { Alert, AlertTitle, Box, Chip, Stack, Tooltip } from "@mui/material";
 import StyledCard from "./StyledCard";
 import { DataGrid } from "@mui/x-data-grid";
 
 const columns = [
-  { field: "id", headerName: "ID", width: 90 },
+  { field: "id", headerName: "ID", width: 90, hide: true },
   {
     field: "input",
     headerName: "Input",
     flex: 1,
     align: "center",
     headerAlign: "center",
-    description: "This is the incorrect input word that is to be replaced",
+    description:
+      "The original, incorrect input word that is suggested for replacement.",
   },
   {
     field: "output",
@@ -19,7 +20,7 @@ const columns = [
     flex: 1,
     align: "center",
     headerAlign: "center",
-    description: "This is the correct output word that is the replacement",
+    description: "The correct replacement for the input word.",
     renderCell: (params) =>
       params.value === "" ? (
         <Chip label="Deleted" color="error" size="small" />
@@ -33,10 +34,11 @@ const columns = [
     width: 120,
     align: "center",
     headerAlign: "center",
-    description: "Is this input/output pair newly introduced by annotators?",
+    description:
+      "Indicates if this input/output pair is a new suggestion by annotators.",
+    hide: true,
   },
   {
-    description: "This is the frequency of usage by project annotators",
     field: "usedBy",
     flex: 1,
     headerName: "Used By",
@@ -63,6 +65,8 @@ const columns = [
     ),
     headerAlign: "center",
     align: "left",
+    description:
+      "Displays which annotators have used this replacement and how many times.",
     sortable: false,
     filterable: false,
   },
@@ -71,23 +75,23 @@ const columns = [
 const Replacements = ({ data }) => {
   return (
     <StyledCard title="Replacements">
+      <Box p={"0rem 0.5rem 1rem 0.5rem"}>
+        <Alert severity="info">
+          <AlertTitle>Understanding Replacements</AlertTitle>
+          Explore token-level transformations, known as "replacements", to
+          comprehend annotator consensus and variation. "Input" denotes original
+          tokens, while "Output" showcases consensus replacements. The "Used By"
+          field quantifies each annotator's adoption, enhancing your oversight
+          and enabling refinement.
+        </Alert>
+      </Box>
       <div style={{ height: 400, width: "100%" }}>
         <DataGrid
           rows={data?.lists.replacementHistory ?? []}
           columns={columns}
-          initialState={{
-            pagination: {
-              paginationModel: { page: 0, pageSize: 5 },
-            },
-            columns: {
-              columnVisibilityModel: {
-                id: false,
-                new: false,
-              },
-            },
-          }}
+          pageSize={5}
           pageSizeOptions={[5, 10]}
-          disableRowSelectionOnClick={true}
+          disableRowSelectionOnClick
         />
       </div>
     </StyledCard>
