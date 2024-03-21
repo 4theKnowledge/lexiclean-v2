@@ -89,6 +89,17 @@ const Replacements = ({ data }) => {
         <DataGrid
           rows={data?.lists.replacementHistory ?? []}
           columns={columns}
+          initialState={{
+            pagination: {
+              paginationModel: { page: 0, pageSize: 5 },
+            },
+            columns: {
+              columnVisibilityModel: {
+                id: false,
+                new: false,
+              },
+            },
+          }}
           pageSize={5}
           pageSizeOptions={[5, 10]}
           disableRowSelectionOnClick
