@@ -11,6 +11,7 @@
   "author": "Tyler Bikaun",
   "license": "ISC",
   "dependencies": {
+    "aws-serverless-express": "^3.4.0",
     "axios": "^1.6.8",
     "combinatorial-generators": "^1.1.2",
     "cors": "^2.8.5",

@@ -17,6 +17,8 @@ import { authenticateUser, projectAccessCheck } from "./middleware/auth.js";
 
 const app = express();
 
+console.log(`Running in ${process.env.AUTH_STRATEGY} mode`);
+
 // Create rate limit rule
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -27,8 +29,9 @@ const apiLimiter = rateLimit({
 
 // Apply the rate limiting middleware to all requests
 app.use(apiLimiter);
+
 // Simple health check
-app.get("/health", (req, res) => {
+app.get("/status", (req, res) => {
   res.status(200).send("OK");
 });
 
@@ -81,4 +84,4 @@ mongoose
 const port = process.env.PORT || 3001;
 app.listen(port, () => console.log(`[server] Started on port ${port}`));
 
-console.log(`Running in ${process.env.AUTH_STRATEGY} mode`);
+export default app;
