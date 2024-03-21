@@ -47,7 +47,7 @@ const config = {
         title: "LexiClean Documentation",
         logo: {
           alt: "LexiClean Logo",
-          src: "img/logo.svg",
+          src: "img/android-chrome-512x512.png",
         },
         items: [
           // {
@@ -65,7 +65,8 @@ const config = {
       },
       footer: {
         style: "dark",
-        copyright: `Copyright © ${new Date().getFullYear()} LexiClean`,
+        // Copyright © ${new Date().getFullYear()} LexiClean -
+        copyright: `Launched into the digital cosmos by 🚀 Tyler Bikaun (4theKnowledge)`,
       },
       prism: {
         theme: prismThemes.github,
