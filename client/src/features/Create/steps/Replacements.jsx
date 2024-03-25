@@ -94,7 +94,7 @@ const JsonEditor = ({ values, updateValue }) => {
         error={Boolean(error)}
         helperText={
           error ||
-          "Enter a valid JSON object. Keys and values must be single words."
+          "Enter a valid JSON object. Keys must be single words. Values can be words or phrases."
         }
         margin="normal"
         variant="outlined"
