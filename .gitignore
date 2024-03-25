@@ -43,3 +43,4 @@ server/*
 TODO.md
 NOTES.md
 *.zip
+client/maintenance_build
