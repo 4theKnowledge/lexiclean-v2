@@ -1,9 +1,13 @@
 ---
-# sidebar_position:
+sidebar_position: 18
 description: LexiClean's privacy policy
 ---
 
 # Privacy Policy
+
+:::info
+This Privacy Policy applies only to the cloud-hosted version of LexiClean. For self-hosted installations, the management of data and privacy practices may differ and are under the jurisdiction of the hosting entity.
+:::
 
 Last updated: _15th May 2024_
 

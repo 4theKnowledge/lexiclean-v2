@@ -1,4 +1,12 @@
+---
+sidebar_position: 17
+---
+
 # Terms and Conditions
+
+:::info
+These Terms and Conditions apply exclusively to the cloud-hosted version of LexiClean. If you're using a self-hosted version of LexiClean, the terms may differ and are defined by the hosting entity.
+:::
 
 Last updated: _15th May 2024_
 
