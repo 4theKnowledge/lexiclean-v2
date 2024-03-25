@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Grid,
   Stack,
@@ -20,24 +20,24 @@ const DATASET_TYPES = [
     title: "Standard Corpus",
     name: "standard",
     tooltip:
-      "Upload a newline separated text corpus without annotations. Tokenization must be done prior to upload.",
+      "For straightforward text uploads, provide a CSV file containing a 'text' header. LexiClean will handle the rest.",
   },
   {
     title: "Corpus with Identifiers",
     name: "identifiers",
     tooltip:
-      "Upload a corpus with identifiers in CSV format. Tokenization must be done prior to upload. Click the help icon for more information.",
+      "To link external identifiers with your texts, upload a CSV featuring 'identifier' and 'text' headers for seamless association.",
   },
   {
     title: "Parallel Corpus",
     name: "parallel",
     tooltip:
-      "Upload a parallel corpus. Tokenization must be done prior to upload. Click the help icon for more information.",
+      "For uploading texts alongside reference materials for tasks like error correction, upload a CSV with 'identifier', 'reference', and 'text' headers.",
   },
 ];
 
 const Upload = ({ values, updateValue }) => {
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState(values.corpus || []);
   const [columns, setColumns] = useState([]);
   const [uploadedFileName, setUploadedFileName] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
@@ -94,14 +94,14 @@ const Upload = ({ values, updateValue }) => {
           }));
           setColumns([
             { field: "identifier", headerName: "Identifier", width: 150 },
-            { field: "text", headerName: "Text", width: 250 },
+            { field: "text", headerName: "Text", width: 250, flex: 1 },
           ]);
           setRows(processedData);
         } else if (corpusType === "identifiers") {
           processedData = data.map((row, index) => ({ ...row, id: index }));
           setColumns([
             { field: "identifier", headerName: "Identifier", width: 150 },
-            { field: "text", headerName: "Text", width: 250 },
+            { field: "text", headerName: "Text", width: 250, flex: 1 },
           ]);
 
           setRows(processedData);
@@ -109,8 +109,13 @@ const Upload = ({ values, updateValue }) => {
           processedData = data.map((row, index) => ({ ...row, id: index }));
           setColumns([
             { field: "identifier", headerName: "Identifier", width: 130 },
-            { field: "reference", headerName: "Reference Text", width: 200 },
-            { field: "text", headerName: "Text", width: 200 },
+            {
+              field: "reference",
+              headerName: "Reference Text",
+              width: 200,
+              flex: 1,
+            },
+            { field: "text", headerName: "Text", width: 200, flex: 1 },
           ]);
           setRows(processedData);
         }
@@ -134,16 +139,30 @@ const Upload = ({ values, updateValue }) => {
     setColumns([]);
     setUploadedFileName("");
     setAlertMessage("");
+    updateValue({ key: "corpus", value: [] });
+    updateValue({ key: "corpusFileName", value: null });
+    updateValue({ key: "corpusType", value: "standard" });
   };
+
+  useEffect(() => {
+    if (values.corpus.length === 0) {
+      resetGrid();
+    }
+  }, [values.corpus]);
 
   return (
     <Grid item xs={12} container spacing={2}>
       <Grid item xs={12}>
         <Alert severity="info">
-          <AlertTitle>Tip!</AlertTitle>
-          Upload your text dataset (corpus) here to normalize and, optionally,
-          tag entities. For details on supported corpus formats, click the help
-          icon. Note: The editor becomes read-only after you upload a file.
+          <AlertTitle>Quick Tip!</AlertTitle>
+          Efficiently normalise and optionally tag token-level entities by
+          uploading your text dataset (corpus) as a CSV file. For guidance on
+          acceptable corpus formats, refer to our detailed documentation.
+          Remember, LexiClean tokenizes on whitespace, so prepare your texts
+          accordingly. To preserve data integrity, especially in texts
+          containing commas, encase your sentences in quotes (e.g., "hello,
+          world"). This ensures commas are correctly interpreted as part of the
+          text, not as column separators.
         </Alert>
         {alertMessage && <Alert severity="error">{alertMessage}</Alert>}
       </Grid>
@@ -203,13 +222,16 @@ const ActionBar = ({ handleChange, resetGrid, uploadedFileName, size }) => {
                   type="file"
                   hidden
                   onChange={(e) => handleChange(e, dataset.name)}
+                  accept="text/csv"
                 />
               </Button>
             </Tooltip>
           ))}
-          <Button variant="text" onClick={resetGrid} size="small">
-            Reset
-          </Button>
+          <Tooltip title="Click to reset this component." arrow placement="top">
+            <Button variant="text" onClick={resetGrid} size="small">
+              Reset
+            </Button>
+          </Tooltip>
         </Stack>
       </Box>
     </>
@@ -219,7 +241,16 @@ const ActionBar = ({ handleChange, resetGrid, uploadedFileName, size }) => {
 const DatasetGrid = ({ rows, columns }) => {
   return (
     <div style={{ height: 400, width: "100%" }}>
-      <DataGrid rows={rows} columns={columns} pageSize={5} />
+      <DataGrid
+        rows={rows}
+        columns={columns}
+        disableColumnSelector
+        disableRowSelectionOnClick
+        initialState={{
+          pagination: { paginationModel: { pageSize: 10 } },
+        }}
+        pageSizeOptions={[5, 10, 25]}
+      />
     </div>
   );
 };
