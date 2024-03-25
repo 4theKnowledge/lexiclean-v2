@@ -10,6 +10,8 @@ import {
   Link as MuiLink,
   Skeleton,
   useMediaQuery,
+  alpha,
+  useTheme,
 } from "@mui/material";
 import { Link } from "react-router-dom";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
@@ -87,6 +89,7 @@ const ActionButton = ({ size = "medium" }) => {
 const Header = () => {
   const useAuthStrategy = getAuthServiceStrategy();
   const { isAuthenticated, login, logout } = useAuthStrategy();
+  const theme = useTheme();
   return (
     <Box
       display="flex"
@@ -97,7 +100,7 @@ const Header = () => {
         position: "sticky",
         top: 0,
         zIndex: 1100,
-        backgroundColor: "inherit",
+        backgroundColor: alpha(theme.palette.background.light, 0.95),
       }}
     >
       {/* Brand */}
@@ -176,6 +179,8 @@ const MainContent = () => {
                   as={Link}
                   to={`${process.env.REACT_APP_DOCS_URL}`}
                   sx={{ textDecoration: "none" }}
+                  target="_blank"
+                  rel="noreferrer"
                 >
                   Find Out More
                 </Button>
@@ -238,7 +243,6 @@ const Features = () => {
       sx={{ display: "flex" }}
     >
       <Paper
-        elevation={2}
         sx={{
           width: "100%",
           p: 4,
