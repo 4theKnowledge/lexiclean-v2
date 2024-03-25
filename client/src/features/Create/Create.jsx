@@ -11,7 +11,7 @@ import {
 } from "@mui/material";
 import LoadingButton from "@mui/lab/LoadingButton";
 import Details from "./steps/Details";
-import Upload from "./steps/upload/Upload";
+import Upload from "./steps/Upload";
 import Preprocessing from "./steps/Preprocessing";
 import Schema from "./steps/Schema";
 import Preannotation from "./steps/Preannotation";
@@ -52,7 +52,7 @@ const CreateProject = () => {
     projectName: "",
     projectDescription: "",
     specialTokens: "",
-    corpusType: "scratch", // Indicates type of data uploaded ('scratch', 'identifiers', 'parallel')
+    corpusType: "standard", // Indicates type of data uploaded ('standard', 'identifiers', 'parallel')
     corpusFileName: null,
     corpus: [],
     preprocessLowerCase: false,
@@ -181,6 +181,8 @@ const CreateProject = () => {
       setIsSubmitting(false);
     }
   };
+
+  // console.log("values", values);
 
   return (
     <Grid
