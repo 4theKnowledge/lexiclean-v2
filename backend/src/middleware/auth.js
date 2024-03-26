@@ -23,7 +23,7 @@ export const projectAccessCheck = async (req, res, next) => {
     const userId = req.userId;
     const projectId = req.params.projectId || req.body.projectId;
 
-    console.log(userId, projectId);
+    // console.log(userId, projectId);
 
     if (!projectId) {
       return res.status(400).json({ message: "Project ID is required." });
