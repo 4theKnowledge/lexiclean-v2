@@ -230,8 +230,6 @@ const MetricWithDiff = ({
   corpusDetails,
   name,
 }) => {
-  console.log("name: ", name);
-
   const comparisonResult = useMemo(() => {
     const originalValue = originalCorpusDetails[name];
     const newValue = corpusDetails[name];
