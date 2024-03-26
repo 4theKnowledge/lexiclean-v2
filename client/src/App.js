@@ -16,8 +16,12 @@ import Account from "./features/Account";
 import AuthPage from "./shared/components/auth/AuthPage";
 import { ProjectProvider } from "./shared/context/ProjectContext";
 import ErrorBoundary from "./shared/components/ErrorBoundary";
+import LoginMock from "./shared/components/auth/LoginMock";
 
 function App() {
+  const isUsingDummyAuth =
+    process.env.REACT_APP_AUTH_STRATEGY.toLowerCase() === "dummy";
+
   return (
     <ThemeProvider>
       <ErrorBoundary>
@@ -29,6 +33,9 @@ function App() {
                 <BrowserRouter>
                   <Routes>
                     <Route path="/auth" element={<AuthPage />} />
+                    {isUsingDummyAuth && (
+                      <Route path="/login" element={<LoginMock />} />
+                    )}
                     <Route index element={<Landing />} />
                     <Route path="/project/:projectId" element={<Project />} />
                     <Route path="/" element={<Layout />}>
