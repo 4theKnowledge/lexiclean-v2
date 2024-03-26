@@ -70,6 +70,10 @@ Upon completion, this area will enable project managers to invite annotators to 
 <img src="/img/interface/dashboard/annotators.png" alt="Dashboard Annotators Section" width="80%"/>
 </div>
 
+## Adjudication
+
+This ...
+
 ## Settings
 
 The Settings section provides options to download all project annotations or to delete the project entirely. It is crucial to remember that deleting the project is a permanent action and cannot be reversed, so it should be done with utmost consideration.

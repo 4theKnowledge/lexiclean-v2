@@ -1,22 +1,20 @@
 ---
 title: Contact
-description: LexiClean Contact
-keywords:
-  - lexiclean
-  - docs
-  - manual
-  - annotation
-sidebar_position: 9
-slug: /contact
+description: LexiClean Contact Information
+sidebar_position: 20
 sidebar_label: Contact
 ---
 
 # Contact Us
 
-We're here to help and answer any questions you might have. We look forward to hearing from you!
+Your feedback, questions, and collaboration ideas are crucial to us. We're here to provide the support you need and look forward to hearing from you!
 
 ## Email
 
-For support or any queries, email us at tylerbikaun@gmail.com.
+For support or any inquiries, please email us at tylerbikaun@gmail.com.
 
-We aim to respond to all inquiries within 48 hours. Thank you for reaching out to us!
+We strive to respond to all emails within 48 hours. Your patience is greatly appreciated.
+
+## GitHub
+
+For more technical queries, suggestions, or if you'd like to contribute to our project, feel free to reach out through our [GitHub repository](https://github.com/nlp-tlp/lexiclean). You can report issues, suggest features, or even look at what's currently being worked on.
