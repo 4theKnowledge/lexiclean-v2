@@ -25,7 +25,10 @@ import Notifications from "../models/Notifications.js";
 import {
   compileTokens,
   documentLevelIAA,
-  getUserAnnotations,
+  getTextsWithUserAnnotations,
+  getCompiledTexts,
+  getSummaryMetrics,
+  getProjectIAA,
 } from "../services/project.js";
 import fs from "fs/promises";
 import path from "path";
@@ -179,6 +182,7 @@ router.post("/create", async (req, res) => {
       name: projectName,
       description: projectDescription,
       parallelCorpus: isParallelCorpusProject,
+      corpusFileName,
       annotators: [userId],
       // settings: {}, // TODO: with preannotation settings.
       preprocessing: {
@@ -228,14 +232,14 @@ router.post("/create", async (req, res) => {
       // `tokens` are from the target
 
       // Create base texts
-      textObjs = Object.keys(corpus).map((textId) => {
+      textObjs = corpus.map((doc) => {
         return {
-          original: corpus[textId].target,
-          reference: corpus[textId].source,
+          original: doc.text,
+          reference: doc.reference,
           weight: 0,
           rank: 0,
           saved: false,
-          identifiers: [textId], // No preprocessing, so duplicates cannot have ids merged.
+          identifiers: [doc.identifier], // Note: No preprocessing, so duplicates cannot have ids merged.
         };
       });
 
@@ -246,13 +250,13 @@ router.post("/create", async (req, res) => {
       // Process texts they are an Object {id:text}. For users who did not select texts with ids, the id is a placeholder.
       const normalisedTexts = Object.assign(
         {},
-        ...Object.keys(corpus).map((textId) => {
-          let text = corpus[textId];
+        ...corpus.map((doc) => {
+          let text = doc.text;
           text = removeTabs(text);
           text = removeCasing(preprocessLowerCase, text);
           text = removeSpecialChars(preprocessRemoveCharSet, text);
           text = removeWhiteSpace(text);
-          return { [textId]: text };
+          return { [doc.identifier]: text };
         })
       );
 
@@ -740,7 +744,16 @@ router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
     const textIds = project.texts;
     delete project.texts;
 
-    const outputAnnotations = await getUserAnnotations(projectId);
+    let textsWithUserAnnotations = await getTextsWithUserAnnotations(projectId);
+
+    // Get compiled texts
+    const compiledTexts = await getCompiledTexts(projectId);
+
+    // Add compiled texts to `textsWithUserAnnotations` array
+    textsWithUserAnnotations = textsWithUserAnnotations.map((text, index) => {
+      text.compiledText = compiledTexts[index].map((token) => token.value);
+      return text;
+    });
 
     const payload = {
       metadata: {
@@ -748,7 +761,7 @@ router.get("/download/:projectId", projectAccessCheck, async (req, res) => {
         annotators: project.annotators.map((a) => a.username),
         totalTexts: textIds.length,
       },
-      annotations: outputAnnotations,
+      annotations: textsWithUserAnnotations,
     };
 
     res.json(payload);
@@ -868,7 +881,7 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
       return acc;
     }, {});
 
-    console.log("userDetails: ", userDetails);
+    // console.log("userDetails: ", userDetails);
 
     const textIds = project.texts.map((t) => mongoose.Types.ObjectId(t));
 
@@ -878,11 +891,11 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
     });
 
     // Get users progress
-    const userSaveCount = savedTexts.filter(
-      (a) => a.userId.toString() === userId.toString()
-    ).length;
+    // const userSaveCount = savedTexts.filter(
+    //   (a) => a.userId.toString() === userId.toString()
+    // ).length;
 
-    const userProgress = (userSaveCount / numTexts) * 100;
+    // const userProgress = (userSaveCount / numTexts) * 100;
 
     // Get projects progress - all users have saved the doc.
     const projectSaveCount = countTextsWithSavesAtThreshold(
@@ -927,76 +940,72 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
 
     console.log("replacementHistory: ", replacementHistory);
 
-    const replacements = await Annotations.find({
-      userId,
-      textId: { $in: textIds },
-      isSuggestion: false,
-      type: "replacement",
-    });
+    // const replacements = await Annotations.find({
+    //   userId,
+    //   textId: { $in: textIds },
+    //   isSuggestion: false,
+    //   type: "replacement",
+    // });
 
-    console.log("replacements: ", replacements);
+    // console.log("replacements: ", replacements);
 
-    let emptyTokens = 0;
+    // let emptyTokens = 0;
 
-    let replacementTokenIds = [];
-    let replacementTokens = [];
+    // let replacementTokenIds = [];
+    // let replacementTokens = [];
 
-    for (const replacement of replacements) {
-      replacementTokenIds.push(replacement.tokenId);
-      if (replacement.value !== "") {
-        replacementTokens.push(replacement.value);
-      } else {
-        emptyTokens += 1;
-      }
-    }
-    console.log("replacementTokens: ", replacementTokens);
-    console.log("emptyTokens replacements: ", emptyTokens);
+    // for (const replacement of replacements) {
+    //   replacementTokenIds.push(replacement.tokenId);
+    //   if (replacement.value !== "") {
+    //     replacementTokens.push(replacement.value);
+    //   } else {
+    //     emptyTokens += 1;
+    //   }
+    // }
+    // console.log("replacementTokens: ", replacementTokens);
+    // console.log("emptyTokens replacements: ", emptyTokens);
 
     // Get all tokens except for those that have been transformed.
-    const allTokens = await Text.aggregate(
-      textTokenSearchPipeline({
-        projectId,
-        excludeTokenIds: replacementTokenIds,
-      })
-    );
+    // const allTokens = await Text.aggregate(
+    //   textTokenSearchPipeline({
+    //     projectId,
+    //     excludeTokenIds: replacementTokenIds,
+    //   })
+    // );
     // console.log("allTokens: ", allTokens);
 
-    let tokens = [];
-    let enTokens = 0;
+    // let tokens = [];
+    // let enTokens = 0;
 
-    for (const token of allTokens) {
-      if (token.value !== "") {
-        tokens.push(token.value);
-        enTokens += token.en ? 1 : 0;
-      } else {
-        emptyTokens += 1;
-      }
-    }
+    // for (const token of allTokens) {
+    //   if (token.value !== "") {
+    //     tokens.push(token.value);
+    //     enTokens += token.en ? 1 : 0;
+    //   } else {
+    //     emptyTokens += 1;
+    //   }
+    // }
     // console.log("tokens:", tokens);
     // console.log("enTokens:", enTokens);
     // console.log("emptyTokens tokens:", emptyTokens);
 
     // Filter out empty strings (placeholders for removed token values)
-    const vocab = new Set(
-      [...tokens, ...replacementTokens].filter((t) => t !== "")
-    );
-    const vocabSize = vocab.size;
 
     // All 'en' tokens are in-vocabulary, all replacements are assumed in-vocabulary as they are user supplied.
-    const currentIVTokens = enTokens + replacementTokens.length;
+    // const currentIVTokens = enTokens + replacementTokens.length;
     // console.log("currentIVTokens: ", currentIVTokens);
 
-    const currentOOVTokens =
-      tokens.length + replacementTokens.length - currentIVTokens;
+    // const currentOOVTokens =
+    //   tokens.length + replacementTokens.length - currentIVTokens;
 
     // console.log("currentOOVTokens:", currentOOVTokens);
 
     // Empty strings are considered 'deleted'
-    const currentTokenCount =
-      tokens.filter((t) => t !== "").length +
-      replacementTokens.map((t) => t !== "").length;
+    // const currentTokenCount =
+    //   tokens.filter((t) => t !== "").length +
+    //   replacementTokens.map((t) => t !== "").length;
 
-    const correctionsMade = replacementTokenIds.length;
+    // const correctionsMade = replacementTokenIds.length;
 
     // Get users that have been invited to the project.
 
@@ -1022,6 +1031,17 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
       })),
       ...invitedUsers,
     ];
+
+    // Get compiled texts
+    const compiledTexts = await getCompiledTexts(projectId);
+
+    console.log("compiledTexts: ", compiledTexts);
+
+    const { vocabSize, tokenCount, correctionsMade } =
+      getSummaryMetrics(compiledTexts);
+
+    // GET project IAA
+    const iaa = await getProjectIAA(projectId);
 
     res.json({
       isOwner,
@@ -1066,17 +1086,17 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
           name: "Adjusted Vocabulary Size",
           value: vocabSize,
           description:
-            "Under review: The current size of the vocabulary after applying corrections and normalisations.",
+            "The current size of the vocabulary after applying corrections and normalisations.",
         },
         {
           name: "Vocabulary Reduction Rate",
-          value: Math.round(
+          value: `${Math.round(
             ((project.metrics.startVocabSize - vocabSize) /
               project.metrics.startVocabSize) *
               100
-          ),
+          )}%`,
           description:
-            "Under review: Percentage reduction in vocabulary size from the start of the project to the current state.",
+            "Percentage reduction in vocabulary size from the start of the project to the current state.",
         },
         {
           name: "Initial Token Count",
@@ -1086,34 +1106,34 @@ router.get("/summary/:projectId", projectAccessCheck, async (req, res) => {
         },
         {
           name: "Current Token Count",
-          value: currentTokenCount,
+          value: tokenCount,
           description:
-            "Under review: Current total number of tokens across all texts, reflecting any additions or deletions.",
+            "Current total number of tokens across all texts, reflecting any additions or deletions.",
         },
         {
           name: "Corrections Applied",
           value: correctionsMade,
           description:
-            "Under review: Total number of corrections or normalizations applied to tokens throughout the project.",
+            "Total number of corrections or normalisations applied to tokens throughout the project.",
         },
-        {
-          name: "Unnormalised Tokens",
-          value: currentOOVTokens,
-          description:
-            "Under review: Current number of out-of-vocabulary (OOV) tokens that have not yet been normalised or corrected.",
-        },
+        // {
+        //   name: "Unnormalised Tokens",
+        //   value: currentOOVTokens,
+        //   description:
+        //     "Under review: Current number of out-of-vocabulary (OOV) tokens that have not yet been normalised or corrected.",
+        // },
         {
           name: "Inter-Annotator Agreement",
-          value: "TBD",
+          value: `${Math.round(iaa)}%`,
           description:
-            "Under review: The consistency of annotations across different annotators. A higher percentage indicates greater agreement and reliability of the annotations.",
+            "The consistency of annotations across different annotators. A higher percentage indicates greater agreement and reliability of the annotations.",
         },
-        {
-          name: "Greatest Contributor",
-          value: "TBD",
-          description:
-            "Under review: The annotator who has made the most contributions (annotations or corrections) to the project.",
-        },
+        // {
+        //   name: "Greatest Contributor",
+        //   value: "TBD",
+        //   description:
+        //     "Under review: The annotator who has made the most contributions (annotations or corrections) to the project.",
+        // },
       ],
       lists: {
         replacementHistory,
@@ -1237,9 +1257,12 @@ router.get(
       const textCount = await Text.count({ projectId });
       const skipCount = (pageNumber - 1) * DOCUMENT_LIMIT; // Calculate skip based on page number
 
-      const userAnnotations = await getUserAnnotations(projectId, skipCount);
+      const textsWithUserAnnotations = await getTextsWithUserAnnotations(
+        projectId,
+        skipCount
+      );
 
-      const adjudicationData = userAnnotations.map((text) => {
+      const adjudicationData = textsWithUserAnnotations.map((text) => {
         let transformed = {
           _id: text.id, // Copy the id to _id
           input: text.sourceTokens, // Copy the sourceTokens directly
@@ -1260,7 +1283,12 @@ router.get(
           transformed.annotations
         );
 
-        const compiledTokens = compileTokens(transformed.annotations);
+        const compiledTokens = compileTokens(
+          transformed.annotations,
+          transformed.input
+        );
+
+        console.log("compiledTokens: ", compiledTokens);
 
         transformed = {
           ...transformed,
