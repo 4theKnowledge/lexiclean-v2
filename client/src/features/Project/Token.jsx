@@ -1,26 +1,12 @@
 import { useState, useEffect, useContext, useRef } from "react";
-import {
-  Typography,
-  Stack,
-  TextField,
-  Popover,
-  Divider,
-  Box,
-} from "@mui/material";
+import { Typography, Stack, Popover, Divider, Box } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import EditPopover from "./EditPopover";
 import { alpha } from "@mui/material/styles";
 import { ProjectContext } from "../../shared/context/ProjectContext";
-import { getTokenWidth } from "../../shared/utils/token";
 import SpanEntityAnnotation from "./SpanEntityAnnotation";
 import { useTheme } from "@mui/material/styles";
-
-export const TokenInputComponent = styled(TextField)((props) => ({
-  textAlign: "center",
-  "::selection": {
-    background: "transparent",
-  },
-}));
+import TokenInputComponent from "../../shared/components/annotation/TokenInputComponent";
 
 export const SpanComponent = styled(Typography)((props) => ({
   userSelect: "none",
@@ -51,7 +37,6 @@ const Token = ({ textId, token, tokenIndex }) => {
 
   const handlePrimaryPopoverClose = () => {
     setAnchorEl(null);
-    console.log(token);
     dispatch({
       type: "UPDATE_TOKEN_VALUE",
       payload: {
@@ -142,32 +127,19 @@ const Token = ({ textId, token, tokenIndex }) => {
       tokenindex={tokenIndex}
     >
       <TokenInputComponent
-        ref={tokenRef}
-        variant="standard"
-        tokenindex={tokenIndex}
-        key={token._id}
+        token={token}
+        tokenRef={tokenRef}
+        tokenIndex={tokenIndex}
         onChange={(e) => handleTokenEdit(e, e.target.value)}
-        autoComplete="off"
-        value={token.currentValue}
-        inputProps={{
-          style: {
-            textAlign: "center",
-            width: getTokenWidth(token.currentValue),
-            color: tokenColor,
-            backgroundColor: tokenBgColor,
-            borderRadius: 4,
-          },
-        }}
-        InputProps={{
-          disableUnderline: true,
-        }}
-        title={`value: ${token.value} | replacement: ${token.replacement} | suggestion: ${token.suggestion}`}
         onContextMenu={(e) => {
           e.preventDefault();
           handlePrimaryPopoverOpen(e);
         }}
-        contextMenu="none"
         onClick={() => handleTokenSelect(token._id)}
+        tokenColor={tokenColor}
+        tokenBgColor={tokenBgColor}
+        value={token.currentValue}
+        title={`value: ${token.value} | replacement: ${token.replacement} | suggestion: ${token.suggestion}`}
       />
       {tokenHasSpan && (
         <SpanComponent
