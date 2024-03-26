@@ -38,3 +38,49 @@ export const getContrastTextColor = (hexColor) => {
   // Return white for dark colors and black for light colors.
   return luminance < 0.5 ? "#FFFFFF" : "#000000";
 };
+
+export const processFileContent = (fileExt, corpusType, content) => {
+  switch (fileExt) {
+    case "txt":
+      if (corpusType === "standard") {
+        return content
+          .split("\n")
+          .filter((line) => line !== "")
+          .map((line) => line.replace("\r", ""));
+      }
+      break;
+    case "csv":
+      if (corpusType === "identifiers") {
+        return content
+          .split("\n")
+          .filter((line) => line !== "")
+          .map((line) => {
+            const [id, ...rest] = line.split(",").map((part) => part.trim());
+            return { [id]: rest.join(",") };
+          })
+          .reduce((acc, val) => ({ ...acc, ...val }), {});
+      }
+      break;
+    case "json":
+      if (corpusType === "parallel") {
+        return JSON.parse(content).reduce((acc, item, index) => {
+          const key = item.id !== undefined ? item.id : index;
+          return { ...acc, [key]: item };
+        }, {});
+      }
+      break;
+    default:
+      return null;
+  }
+};
+
+export const getCorpusMetrics = (corpusArray) => {
+  // corpusArray = [text,...]
+  return {
+    corpusSize: corpusArray.length,
+    vocabSize: new Set(corpusArray.flatMap((text) => text.split(" "))).size,
+    tokenSize: corpusArray.flatMap((text) => text.split(" ")).length,
+  };
+};
+
+export const preprocess = ({ data }) => {};
