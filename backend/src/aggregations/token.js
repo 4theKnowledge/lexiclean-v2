@@ -103,3 +103,27 @@ export const singleTokenFromTextPipeline = ({ textId, tokenId }) => [
     $replaceRoot: { newRoot: "$tokens" },
   },
 ];
+
+/**
+ * Aggregation pipeline to find tokens within documents that match a given search term,
+ * filtering by project ID. Returns the texts with filtered tokens.
+ *
+ * @param {Object} params An object containing the projectId and searchTerm.
+ * @param {string} params.projectId The ID of the project to filter documents by.
+ * @param {string} params.searchTerm The term to match tokens against.
+ * @returns {Object[]} A MongoDB aggregation pipeline array.
+ */
+export const aggregateMatchingTokensPipeline = ({ projectId, searchTerm }) => [
+  { $match: { projectId } },
+  {
+    $project: {
+      tokens: {
+        $filter: {
+          input: "$tokens",
+          as: "token",
+          cond: { $eq: ["$$token.value", searchTerm] },
+        },
+      },
+    },
+  },
+];
