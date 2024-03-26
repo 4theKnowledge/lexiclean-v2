@@ -14,14 +14,14 @@ import Details from "./steps/Details";
 import Upload from "./steps/Upload";
 import Preprocessing from "./steps/Preprocessing";
 import Schema from "./steps/Schema";
-import Preannotation from "./steps/Preannotation";
+import Settings from "./steps/Settings";
 import DoneIcon from "@mui/icons-material/Done";
 import WarningIcon from "@mui/icons-material/Warning";
 import {
   ValidateCreateDetails,
   ValidateCreateSchema,
   ValidateCreateUpload,
-  ValidateCreatePreannotation,
+  ValidateCreateSettings,
   ValidateCreateReview,
   ValidateCreateReplacements,
 } from "../../shared/utils/validation";
@@ -40,7 +40,7 @@ const CreateProject = () => {
     replacements: false,
     schema: false,
     flags: true,
-    preannotation: true,
+    settings: true,
     review: false,
   });
 
@@ -116,17 +116,17 @@ const CreateProject = () => {
       title: "Flags",
       valid: stepValidation.flags,
     },
-    preannotation: {
-      component: <Preannotation values={values} updateValue={updateValue} />,
+    settings: {
+      component: <Settings values={values} updateValue={updateValue} />,
       description: "Upload data for pre-annotation",
       title: "Settings",
-      valid: stepValidation.preannotation,
+      valid: stepValidation.settings,
     },
   };
 
   const stepDisabled = (key) => {
     return (
-      ["preprocessing", "preannotation"].includes(key) &&
+      ["preprocessing", "settings"].includes(key) &&
       values["corpusType"] === "parallel"
     );
   };
@@ -151,10 +151,10 @@ const CreateProject = () => {
     // Preprocessing is valid as long as upload is valid
     updateStepValidation("preprocessing", uploadValid);
 
-    const preannotationValid = ValidateCreatePreannotation(
+    const settingsValid = ValidateCreateSettings(
       values["replacementDictionary"]
     );
-    updateStepValidation("preannotation", preannotationValid);
+    updateStepValidation("settings", settingsValid);
 
     const replacementsValid = ValidateCreateReplacements(
       values["replacementDictionary"]
@@ -165,7 +165,7 @@ const CreateProject = () => {
       detailsValid,
       schemaValid,
       uploadValid,
-      preannotationValid,
+      settingsValid,
       replacementsValid
     );
 
@@ -174,15 +174,13 @@ const CreateProject = () => {
 
   const handleSubmit = async () => {
     try {
-      console.log("payload", values);
+      // console.log("payload", values);
       setIsSubmitting(true);
       await createProject(values);
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // console.log("values", values);
 
   return (
     <Grid

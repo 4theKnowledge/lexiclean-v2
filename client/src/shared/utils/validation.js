@@ -11,13 +11,13 @@ export const ValidateCreateSchema = () => {
 };
 
 export const ValidateCreateUpload = (corpus) => {
-  if (typeof corpus === "object" && corpus !== null && !Array.isArray(corpus)) {
+  if (corpus.length > 0) {
     return true;
   }
   return false;
 };
 
-export const ValidateCreatePreannotation = () => {
+export const ValidateCreateSettings = () => {
   return true;
 };
 
