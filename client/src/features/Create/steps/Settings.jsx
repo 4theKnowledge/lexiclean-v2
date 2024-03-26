@@ -73,6 +73,30 @@ const Preannotation = ({ values, updateValue }) => {
           updateValue({ key: "preannotationRanking", value: targetValue })
         }
       />
+      {/* {corpusType === "annotation" && (
+        <Grid xs={12} container justifyContent="right" p={1}>
+          <Tooltip title="Click to set all uploaded annotations as suggestions. This is useful if performing error correction.">
+            <FormGroup>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={values["annotationsAreSuggestions"]}
+                    onChange={(e) => {
+                      updateValue(
+                        "annotationsAreSuggestions",
+                        !values["annotationsAreSuggestions"]
+                      );
+                    }}
+                    name="annotations-suggestions-checkbox"
+                    size="small"
+                  />
+                }
+                label="Set annotations as suggestions"
+              />
+            </FormGroup>
+          </Tooltip>
+        </Grid>
+      )} */}
     </Stack>
   );
 };
