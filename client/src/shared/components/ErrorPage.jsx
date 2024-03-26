@@ -1,4 +1,5 @@
-import { Box, Paper } from "@mui/material";
+import { Box, Link, Paper, Stack, Typography } from "@mui/material";
+import BrandToolbar from "./Layout/BrandToolbar";
 
 const ErrorPage = () => {
   return (
@@ -20,11 +21,16 @@ const ErrorPage = () => {
         flexDirection="column"
         p={2}
       >
-        <h1>Oops!</h1>
-        <p>Sorry, an unexpected error has occurred.</p>
-        <a href="/" alt="home">
+        <BrandToolbar />
+        <Stack direction="column" alignItems="center" spacing={2} py={2}>
+          <Typography variant="h3">Oops!</Typography>
+          <Typography variant="body2">
+            Sorry, an unexpected error has occurred.
+          </Typography>
+        </Stack>
+        <Link href="/" alt="home">
           Return home
-        </a>
+        </Link>
       </Box>
     </Box>
   );
