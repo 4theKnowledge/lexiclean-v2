@@ -6,6 +6,8 @@ services:
       - mongodb_data:/data/db
     ports:
       - "27017:27017"
+    environment:
+      AUTH_STRATEGY: DUMMY
   
   backend:
     build: ./backend
@@ -13,6 +15,7 @@ services:
       - "3001:3001"
     environment:
       DB_URI: mongodb://mongodb:27017/lexiclean?authSource=admin
+      AUTH_STRATEGY: DUMMY
     command: sh -c "node ./src/setup.js && node ./src/server.js"
     depends_on:
       - mongodb
@@ -25,6 +28,12 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+
+  docs:
+    build: 
+      context: ./docs
+    ports:
+      - "4000:3000"
 
 volumes:
   mongodb_data:
