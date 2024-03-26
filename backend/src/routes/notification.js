@@ -79,15 +79,28 @@ router.post("/invite", async (req, res) => {
       await Notifications.insertMany(notificationObjects); // Use insertMany for bulk insertion
     }
     res.json({
-      invited: usernamesToInvite.map((user) => user.username),
-      alreadyInProject: validUsernames.filter(
-        (username) =>
-          !usernamesToInvite.find((user) => user.username === username)
-      ),
+      invited: usernamesToInvite.map((user) => ({
+        username: user.username,
+        _id: user._id,
+        status: "unread",
+      })),
+      alreadyInProject: validUsers
+        .filter((user) => annotatorIds.includes(user._id))
+        .map((user) => ({
+          username: user.username,
+          status: "accepted",
+          _id: user._id,
+        })),
       invalidUsernames,
-      alreadyInvited: validUsernames.filter(
-        (username) => !usernamesWithNotifications.includes(username)
-      ),
+      alreadyInvited: existingNotifications
+        .filter((n) =>
+          usernamesWithNotifications.includes(n.receiverId.username)
+        )
+        .map((n) => ({
+          username: n.receiverId.username,
+          status: n.status,
+          _id: n.receiverId._id,
+        })),
     });
   } catch (error) {
     console.error(error);
@@ -143,12 +156,6 @@ router.patch("/:id", async (req, res) => {
   try {
     const { accepted } = req.body;
 
-    // Check notification type
-    // if project-invite
-    // check if body has accepted key
-    // if accepted, add to project, set as "read"
-    // if declined, set as "read".
-
     const notification = await Notifications.findByIdAndUpdate(
       req.params.id,
       { status: accepted ? "accepted" : "declined" },
@@ -176,4 +183,4 @@ router.patch("/:id", async (req, res) => {
   }
 });
 
-export default router; // Don't forget to export the router
+export default router;

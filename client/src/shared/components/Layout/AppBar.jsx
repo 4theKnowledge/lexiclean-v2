@@ -1,14 +1,6 @@
-import {
-  Badge,
-  IconButton,
-  Stack,
-  Toolbar,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { IconButton, Stack, Toolbar, Typography } from "@mui/material";
 import MuiAppBar from "@mui/material/AppBar";
 import MenuIcon from "@mui/icons-material/Menu";
-import NotificationsIcon from "@mui/icons-material/Notifications";
 import { styled } from "@mui/material/styles";
 
 import { PRIMARY_SIDEBAR_WIDTH } from "../../constants/layout";
@@ -18,7 +10,6 @@ import { useLocation, useParams } from "react-router-dom";
 import { useContext, useEffect, useState } from "react";
 import { ProjectContext } from "../../context/ProjectContext";
 import useProjectActions from "../../hooks/api/project";
-import useApi from "../../hooks/useApi";
 import NotificationsBell from "./NotificationsBell";
 
 const AppBar = styled(MuiAppBar, {
@@ -39,25 +30,12 @@ const AppBar = styled(MuiAppBar, {
   }),
 }));
 
-const getNotificationTitle = (count) => {
-  if (count === 0) {
-    return "You have no unread notifications";
-  } else if (count === 1) {
-    return "You have 1 unread notification";
-  } else {
-    return `You have ${count} unread notifications`;
-  }
-};
-
 const CustomAppBar = ({ drawerOpen, handleDrawerToggle }) => {
   const location = useLocation();
   const { projectId } = useParams();
   const { state } = useAppContext();
   const { getProjectName } = useProjectActions();
   const [currentPageContext, setCurrentPageContext] = useState("Loading...");
-  const unreadNotificationsCount = state.notifications.filter(
-    (n) => !n.read
-  ).length;
   const locationSlugs = location.pathname.split("/").filter(Boolean);
   const breadcrumbs = "/ " + locationSlugs.join(" / ");
 
@@ -130,13 +108,6 @@ const CustomAppBar = ({ drawerOpen, handleDrawerToggle }) => {
         </Stack>
         <Stack direction="row" spacing={2} alignItems="center">
           <NotificationsBell notifications={state.notifications} />
-          {/* <IconButton color="inherit">
-            <Tooltip title={getNotificationTitle(unreadNotificationsCount)}>
-              <Badge badgeContent={unreadNotificationsCount} color="primary">
-                <NotificationsIcon />
-              </Badge>
-            </Tooltip>
-          </IconButton> */}
           <ThemeToggleButton />
         </Stack>
       </Toolbar>
