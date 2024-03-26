@@ -50,12 +50,11 @@ const config = {
           src: "img/android-chrome-512x512.png",
         },
         items: [
-          // {
-          //   type: "docSidebar",
-          //   sidebarId: "tutorialSidebar",
-          //   position: "left",
-          //   label: "Tutorial",
-          // },
+          {
+            href: "https://github.com/nlp-tlp/lexiclean",
+            label: "GitHub",
+            position: "right",
+          },
           {
             href: "https://lexiclean.nlp-tlp.org",
             label: "LexiClean",
