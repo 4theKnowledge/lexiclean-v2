@@ -46,6 +46,9 @@ export function AppProvider({ children }) {
       const initializeApp = async () => {
         try {
           const token = await getAccessTokenSilently({ authorizationParams });
+
+          // console.log("token: ", token);
+
           dispatch({ type: "SET_TOKEN", payload: token });
 
           const [userDataResponse, notificationsResponse] = await Promise.all([
@@ -60,6 +63,8 @@ export function AppProvider({ children }) {
               },
             }),
           ]);
+
+          // console.log("userDataResponse: ", userDataResponse);
 
           if (userDataResponse.status === 200) {
             dispatch({ type: "SET_USER", payload: userDataResponse.data });
