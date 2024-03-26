@@ -23,6 +23,10 @@ const ProjectSchema = mongoose.Schema(
       removeChars: { type: String, required: false },
       digitsIV: { type: Boolean, required: false },
     },
+    corpusFileName: {
+      type: String,
+      required: false,
+    },
     texts: [
       {
         type: Schema.Types.ObjectId,
