@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import {
   textTokenSearchPipeline,
   singleTokenFromTextPipeline,
+  aggregateMatchingTokensPipeline,
 } from "../aggregations/token.js";
 
 const router = express.Router();
@@ -433,9 +434,10 @@ router.patch("/remove", async (req, res) => {
     const userId = req.userId;
 
     let annotations = [];
+    let matches = 0;
     let textTokenIds = {};
 
-    let { applyAll, tokenId, textId, projectId } = req.body;
+    let { applyAll, tokenId, textId, projectId, originalValue } = req.body;
 
     textId = mongoose.Types.ObjectId(req.body.textId);
     tokenId = mongoose.Types.ObjectId(req.body.tokenId);
@@ -443,7 +445,55 @@ router.patch("/remove", async (req, res) => {
 
     if (applyAll) {
       console.log("remove many");
-      // ...
+
+      // Find all matching tokens by value
+      const result = await Text.aggregate(
+        aggregateMatchingTokensPipeline({
+          projectId,
+          searchTerm: originalValue,
+        })
+      );
+
+      console.log("result: ", result);
+
+      let bulkOps = [];
+      // Find all replacements on matching tokens (these will be removed and replaced with empty string)
+      for (const text of result) {
+        const textId = text._id;
+
+        if (text.tokens.length > 0) {
+          if (!textTokenIds[textId]) {
+            textTokenIds[textId] = [];
+          }
+
+          for (const token of text.tokens) {
+            const tokenId = token._id;
+
+            textTokenIds[textId].push(tokenId);
+            matches++;
+
+            bulkOps.push({
+              updateOne: {
+                filter: { tokenId: token._id },
+                update: {
+                  $set: {
+                    isSuggestion: false,
+                    value: "",
+                    type: "replacement",
+                    userId,
+                    textId,
+                    tokenId,
+                  },
+                },
+                upsert: true, // Upserts a document if no document matches the filter
+              },
+            });
+          }
+        }
+      }
+
+      // Assuming `Annotations` is your MongoDB model
+      await Annotations.bulkWrite(bulkOps);
     } else {
       console.log("remove one");
 
@@ -475,9 +525,12 @@ router.patch("/remove", async (req, res) => {
         textTokenIds = { [textId]: [tokenId] };
         annotations.push({ dummy: "token" });
       }
+
+      matches = 1;
     }
+
     res.json({
-      matches: annotations.length,
+      matches,
       textTokenIds,
     });
   } catch (error) {
