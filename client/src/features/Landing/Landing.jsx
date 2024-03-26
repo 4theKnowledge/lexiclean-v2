@@ -16,11 +16,11 @@ import {
 import { Link } from "react-router-dom";
 import ArrowForwardIosIcon from "@mui/icons-material/ArrowForwardIos";
 import GitHubIcon from "@mui/icons-material/GitHub";
-import BubbleChartIcon from "@mui/icons-material/BubbleChart";
 import ThemeToggleButton from "../../shared/components/Layout/ThemeToggleButton";
 import { getAuthServiceStrategy } from "../../shared/auth/AuthServiceConfig";
 import { useContext, useState } from "react";
 import { ThemeContext } from "../../shared/context/ThemeContext";
+import BrandToolbar from "../../shared/components/Layout/BrandToolbar";
 
 const features = [
   {
@@ -104,12 +104,7 @@ const Header = () => {
       }}
     >
       {/* Brand */}
-      <Stack direction="row" spacing={1} alignItems="center">
-        <BubbleChartIcon sx={{ color: "text.brandText" }} />
-        <Typography fontWeight={600} color="text.brandText" variant="h6">
-          LexiClean
-        </Typography>
-      </Stack>
+      <BrandToolbar />
       {/* Actions */}
       <Stack direction="row" spacing={1} alignItems="center">
         {/* <Button size="small">Documentation</Button> */}
