@@ -166,16 +166,10 @@ const PrimarySidebar = ({ drawerOpen, handleDrawerToggle }) => {
               direction="column"
               alignItems="center"
             >
-              {/* {process.env.REACT_APP_SINGLE_USER ? (
-                <Box>
-                  <Typography>Single User Mode</Typography>
-                </Box>
-              ) : ( */}
               <UserDetail
                 drawerOpen={drawerOpen}
                 handleDrawerToggle={handleDrawerToggle}
               />
-              {/* )} */}
               <LogoutButton drawerOpen={drawerOpen} />
             </Stack>
           </Box>
