@@ -1,42 +1,11 @@
 import { combinations } from "combinatorial-generators";
 import { diffChars } from "diff";
 import Annotations from "../models/Annotations.js";
-import mongoose from "mongoose";
 import Project from "../models/Project.js";
 import Text from "../models/Text.js";
 
-const extractTags = (token, tagSets) => {
-  return Object.keys(tagSets)
-    .filter((key) => key !== "rp")
-    .reduce((tags, key) => ({ ...tags, [key]: tagSets[key].has(token) }), {});
-};
-
-export const createAnnotatedTokens = (
-  projectId,
-  textId,
-  tokens,
-  tagSets,
-  replacements,
-  annotateDigits = false
-) => {
-  const hasReplacements = "rp" in tagSets;
-
-  return tokens.map((token, index) => {
-    const tokenTags = extractTags(token, tagSets);
-    const isDigit = annotateDigits && /^\d+$/g.test(token);
-
-    return {
-      value: token,
-      index,
-      // tags: isDigit ? { ...tokenTags, en: true } : tokenTags,
-      // replacement: hasReplacements && tagSets.rp.has(token) ? replacements[token] : null,
-      // suggestion: null, // Assuming you'll add logic here later
-      // active: true, // Assuming this is always true, adjust as needed
-      textId,
-      projectId,
-    };
-  });
-};
+const average = (arr) =>
+  arr.length === 0 ? 0 : arr.reduce((acc, val) => acc + val, 0) / arr.length;
 
 const compareWords = (word1, word2) => {
   if (word1 === word2) {
@@ -45,7 +14,6 @@ const compareWords = (word1, word2) => {
   }
 
   const diffs = diffChars(word1, word2);
-  // console.log("diffs: ", diffs);
   let matchingCharacters = 0;
   let totalCharacters = 0;
 
@@ -85,8 +53,6 @@ const computePairwiseSimilarity = (annotations) => {
     pairwiseScores.push(averageSimilarity);
   }
 
-  // console.log(tokenLevelScores);
-
   // Calculate average IAA per token
   const tokenAverages = tokenLevelScores.map((scores) => {
     return scores.reduce((a, b) => a + b, 0) / scores.length;
@@ -124,9 +90,41 @@ export const documentLevelIAA = (annotations) => {
   return [documentIaa, pairwiseScoresWithAnnotators, tokenAverages];
 };
 
-export const compileTokens = (annotations) => {
-  // Assuming all annotators have the same number of tokens
-  const tokenPositions = annotations[Object.keys(annotations)[0]].tokens.length;
+// export const compileTokens = (annotations) => {
+//   // Assuming all annotators have the same number of tokens
+//   const tokenPositions = annotations[Object.keys(annotations)[0]].tokens.length;
+//   const compiledTokens = [];
+
+//   for (let i = 0; i < tokenPositions; i++) {
+//     const tokenCounts = {};
+
+//     // Gather tokens at this position from all annotators and count occurrences
+//     Object.values(annotations).forEach((annotator) => {
+//       const token = annotator.tokens[i]; //.toLowerCase(); // Case insensitive comparison
+//       tokenCounts[token] = (tokenCounts[token] || 0) + 1;
+//     });
+
+//     // Find the token with the highest count
+//     const compiledToken = Object.keys(tokenCounts).reduce((a, b) => {
+//       return tokenCounts[a] > tokenCounts[b] ? a : b;
+//     });
+
+//     compiledTokens.push(compiledToken);
+//   }
+
+//   return compiledTokens;
+// };
+
+/**
+ * Compiles tokens from annotations, comparing them against the original text tokens to determine if changes were made.
+ *
+ * @param {Object} annotations - An object containing annotator IDs as keys and their corresponding tokens as values.
+ * @param {Array} input - The original array of tokens for comparison.
+ * @returns {Array} An array of objects, each containing the compiled token and a flag indicating if it was changed or unchanged.
+ */
+export const compileTokens = (annotations, input) => {
+  // Assuming all annotators have the same number of tokens as the input
+  const tokenPositions = input.length;
   const compiledTokens = [];
 
   for (let i = 0; i < tokenPositions; i++) {
@@ -134,19 +132,70 @@ export const compileTokens = (annotations) => {
 
     // Gather tokens at this position from all annotators and count occurrences
     Object.values(annotations).forEach((annotator) => {
-      const token = annotator.tokens[i]; //.toLowerCase(); // Case insensitive comparison
+      const token = annotator.tokens[i]; // Assuming case sensitivity is important
       tokenCounts[token] = (tokenCounts[token] || 0) + 1;
     });
 
-    // Find the token with the highest count
-    const compiledToken = Object.keys(tokenCounts).reduce((a, b) => {
-      return tokenCounts[a] > tokenCounts[b] ? a : b;
-    });
+    // Find the token with the highest count (most frequent token)
+    const compiledToken = Object.keys(tokenCounts).reduce((a, b) =>
+      tokenCounts[a] > tokenCounts[b] ? a : b
+    );
 
-    compiledTokens.push(compiledToken);
+    // Determine if the compiled token matches the original token
+    const isChanged = compiledToken !== input[i];
+
+    compiledTokens.push({ value: compiledToken, changed: isChanged });
   }
 
   return compiledTokens;
+};
+
+/**
+ * Retrieves compiled texts for a specific project, where compiled texts are derived from tokens with majority agreement among user annotations.
+ *
+ * @param {String} projectId - The unique identifier of the project.
+ * @returns {Promise<Array>} A promise that resolves to an array of compiled texts. Each compiled text is represented as an array of token strings.
+ * @throws {Error} Throws an error if unable to retrieve text annotations or compile texts.
+ */
+export const getCompiledTexts = async (projectId) => {
+  try {
+    // Attempt to get all user annotations for the project
+    const textsWithUserAnnotations = await getTextsWithUserAnnotations(
+      projectId
+    );
+
+    // Compile texts from user annotations
+    const compiledTexts = textsWithUserAnnotations.map((text) => {
+      try {
+        // Structure the annotations by iterating through users in the replacements
+        const userTokens = Object.assign(
+          {},
+          ...Object.keys(text.replacements).map((user) => ({
+            [user]: { tokens: text.replacements[user] },
+          }))
+        );
+
+        // Compile tokens from user annotations into a single text representation
+        return compileTokens(userTokens, text.sourceTokens);
+      } catch (innerError) {
+        console.error(
+          `Error compiling tokens for text in project ${projectId}: ${innerError}`
+        );
+        throw new Error(
+          `Failed to compile tokens for a text in project ${projectId}.`
+        );
+      }
+    });
+
+    return compiledTexts;
+  } catch (error) {
+    console.error(
+      `Error retrieving compiled texts for project ${projectId}: ${error}`
+    );
+    throw new Error(
+      `Failed to retrieve compiled texts for project ${projectId}.`
+    );
+  }
 };
 
 /**
@@ -165,7 +214,10 @@ export const compileTokens = (annotations) => {
  * @returns {Promise<Array>} - A promise that resolves to an array of annotations
  *                             aligned with their corresponding texts.
  */
-export const getUserAnnotations = async (projectId, skipCount = null) => {
+export const getTextsWithUserAnnotations = async (
+  projectId,
+  skipCount = null
+) => {
   const project = await Project.findById(
     {
       _id: projectId,
@@ -362,4 +414,110 @@ export const getUserAnnotations = async (projectId, skipCount = null) => {
   });
 
   return outputAnnotations;
+};
+
+/**
+ * Counts unique token values and total tokens in arrays of arrays of objects,
+ * also counting how many objects have 'changed' set to true.
+ * This function is specifically designed to work with tokenized texts where each token is represented
+ * by an object with a 'value' string and a 'changed' boolean indicating if the token was altered.
+ *
+ * @param {Array<Array<{ value: string, changed: boolean }>>} arrays - The input arrays of arrays of objects.
+ * @returns {Object} An object containing counts for unique tokens, total tokens, and changes.
+ */
+const countCompiledTokensAndChanges = (arrays) => {
+  const stringCounts = {};
+  let totalTokens = 0;
+  let totalChanges = 0; // Counter for total number of tokens with changed: true
+
+  arrays.forEach((subArray) => {
+    subArray.forEach(({ value, changed }) => {
+      stringCounts[value] = (stringCounts[value] || 0) + 1;
+      totalTokens++;
+      if (changed) totalChanges++;
+    });
+  });
+
+  const uniqueTokens = Object.keys(stringCounts).length;
+
+  return { uniqueTokens, totalTokens, totalChanges };
+};
+
+/**
+ * Gets project summary metrics using compiled texts which are arrays of token strings.
+ */
+export const getSummaryMetrics = (compiledTexts) => {
+  try {
+    const { uniqueTokens, totalTokens, totalChanges } =
+      countCompiledTokensAndChanges(compiledTexts);
+
+    return {
+      vocabSize: uniqueTokens,
+      tokenCount: totalTokens,
+      correctionsMade: totalChanges,
+    };
+  } catch (error) {}
+};
+
+/**
+ * Calculates the Inter-Annotator Agreement (IAA) score for a given project based on user annotations.
+ * This function retrieves all user annotations for the specified project, computes individual text IAA scores,
+ * and then calculates the average IAA score across all texts in the project.
+ *
+ * @param {string} projectId - The unique identifier of the project for which to calculate IAA scores.
+ * @returns {Promise<number>} A promise that resolves to the average IAA score for the project. If an error occurs,
+ * it logs the error and rethrows a descriptive error. If the project contains no texts or an error occurs in calculating
+ * IAA scores for any text, the function may throw an error or return an undefined behavior.
+ *
+ * Note: This function uses `getTextsWithUserAnnotations` to retrieve annotations and `documentLevelIAA` to calculate IAA scores.
+ */
+export const getProjectIAA = async (projectId) => {
+  try {
+    // Attempt to get all user annotations for the project
+    const textsWithUserAnnotations = await getTextsWithUserAnnotations(
+      projectId
+    );
+
+    // Check if there are texts to calculate IAA scores for
+    if (textsWithUserAnnotations.length === 0) {
+      console.log(`No texts found for project ${projectId}.`);
+      return 0; // Optionally return a default value or handle as needed
+    }
+
+    // Get text IAA from user annotations
+    const textIAAScores = textsWithUserAnnotations.map((text) => {
+      try {
+        // Structure the annotations by iterating through users in the replacements
+        const userTokens = Object.assign(
+          {},
+          ...Object.keys(text.replacements).map((user) => ({
+            [user]: { tokens: text.replacements[user] },
+          }))
+        );
+
+        // Compile tokens from user annotations into a single text representation
+        const [iaaScore] = documentLevelIAA(userTokens);
+
+        return iaaScore;
+      } catch (innerError) {
+        console.error(
+          `Error calculating IAA for text in project ${projectId}: ${innerError}`
+        );
+        throw new Error(
+          `Failed to calculate IAA for a text in project ${projectId}.`
+        );
+      }
+    });
+
+    // Calculate and return the average IAA score
+    const averageScore = textIAAScores.length > 0 ? average(textIAAScores) : 0;
+    return averageScore;
+  } catch (error) {
+    console.error(
+      `Error calculating project IAA for project ${projectId}: ${error}`
+    );
+    throw new Error(
+      `Failed to calculate project IAA for project ${projectId}.`
+    );
+  }
 };
