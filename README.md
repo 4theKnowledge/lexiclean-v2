@@ -1,75 +1,118 @@
-# LexiClean: An annotation tool for rapid multi-task lexical normalisation
+# LexiClean: An Annotation Tool for Rapid Multi-Task Lexical Normalisation
 
-LexiClean is a rapid annotation tool for acquiring parallel corpora for lexical normalisation built with the full-stack web-based framework MERN (MongoDB-Express-React-Node). A live demonstration of the tool can be found at https://lexiclean.nlp-tlp.org and a systems demonstration video at https://youtu.be/P7_ooKrQPDU.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-### Dependencies
-LexiClean requires both MongoDB and Node.js (*Express and React are bundled with Node.js*)
+<!-- [![Read the Paper](https://img.shields.io/badge/Read_the_Paper-LexiClean-brightgreen.svg)](URL_TO_YOUR_PAPER) -->
 
-- MongoDB (v4.4.6) (see: https://docs.mongodb.com/manual/installation/)
-- Node.js (v14.17.1) (see: https://nodejs.org/en/download/)
+LexiClean is a rapid annotation tool for acquiring parallel corpora for lexical normalisation built with the full-stack web-based framework MERN (MongoDB-Express-React-Node).
 
-## How to install (standard)
-LexiClean can be built and served locally once the dependencies are met. First, install MongoDB by following the url specified above. Once installed, in a new terminal, check that it is running as a service using:
+<!-- A live demonstration of the tool can be found at https://lexiclean.nlp-tlp.org and a systems demonstration video at X. -->
 
-    $ service mongod status
-  
-If should have an *active* status.
+> Note: LexiClean version 1.0.0 was released in 2021 to accompany a paper published in EMNLP. The video of the original software can be found [here](https://youtu.be/P7_ooKrQPDU). The current version of LexiClean in this repository is 2.0.0 and represents a substantial deviation from the original with a new demonstration video planned.
 
-<!-- ```$ brew services list```  for macOS-->
+## Features
 
+- **Elevate & Protect Your Data**: Boost your data’s quality and safeguard privacy with LexiClean. Our tool combines advanced normalisation and tagging capabilities to refine your text data meticulously, ensuring precision and protection effortlessly.
+- **Collaboration Meets Innovation**: Embrace collaborative intelligence with LexiClean. Our platform empowers you to join forces with peers, enhancing data accuracy and unveiling deep insights, all within a shared, innovative workspace.
+- **Empowering the Future, Openly**: Commitment to open-source is at our core. LexiClean invites you to refine text quality and protect sensitive data with full confidence, leveraging our transparent, community-driven solutions in your own environment.
+- **Machine Learning Ready**: Streamline your annotation tasks with LexiClean’s OpenAI integration. Access annotated datasets effortlessly, readying your machine learning models for the future, faster and more efficiently.
 
-Next, clone this repository into a folder and navigate to the root of the directory:
+## Built With
 
-    $ git clone https://github.com/nlp-tlp/lexiclean.git
-    $ cd lexiclean
+- React - The web framework used
+- Node.js - Server Environment
+- MongoDB - Database
+- Docker - Containerization
 
-After this, install LexiCleans back-end *server* and front-end *client* dependencies using `npm`. For the client, navigate to `./client` using `$ cd ./client` in your terminal. Server dependencies will be installed at the root (`/`) level.
+## Getting Started
 
-    $ npm install
+This application is containerised using Docker, making it straightforward to set up and run on any system with Docker and Docker Compose installed. Follow the steps below to get your application up and running.
 
+### Cloning the Project
 
-Once the dependencies have been succesfully installed, environmental variables for the database connection and authorisation system need to be set. In the root directory (`/`) add an `.env` file with the structure shown below. This can be done using a text editor or `vi .env` in linux.
-  
-    DB_HOST=localhost
-    DB_PORT=27017
-    DB_NAME=lexiclean
-    TOKEN_SECRET=<secret_key>
+First, clone the LexiClean repository and navigate into its root directory:
 
-The `<secret_key>` should be strong (see: https://www.allkeysgenerator.com/Random/Security-Encryption-Key-Generator.aspx).
+```bash
+# Clone the repository
+git clone https://github.com/<FINAL_REPO_NAME_HERE>
 
-Now you're ready to populate the database with an English lexicon and start annotating! To populate the database with the English lexicon (`en_lexicon.json`), navigate to the root directory (`/`) in LexiClean. Ensure that your `.env` is set-up correctly before commencing this step. When ready, run the following command in your terminal:
-
-    $ node en_lexicon_insert.js
-
-
-###
-After installation of LexiClean, launch the application from the root directory (`/`) by running:
-
-    $ npm run app
-
-
-## How to install (docker)
-LexiClean can be built using Docker. To do so, in the parent directory, execute:
-```
-$ make run
+# Navigate to the project directory
+cd lexiclean
 ```
 
-or alternatively:
-```
-$ docker-compose -f docker-compose.yml up
+### Prerequisites
+
+- Docker: Ensure you have Docker installed on your system. You can download it from [Docker's official website](https://docs.docker.com/get-docker/).
+- Docker Compose: Ensure Docker Compose is installed. It typically comes with the Docker Desktop installation.
+
+### Setting Up Environmental Variables
+
+Before running LexiClean, you must configure the required environment variables for the backend and client. These variables are essential for configuring the application services and ensuring secure and proper operation.
+
+#### Backend
+
+Create a `.env` file in the root directory of `./backend` and populate it with the necessary environment variables. Here is an example `.env` file:
+
+```makefile
+DB_URI = mongodb://localhost:27017/lexiclean
+
+# Optional Auth0 configuration
+AUTH0_DOMAIN=
+AUTH0_CLIENT_ID=
+AUTH0_AUDIENCE=
+AUTH0_SECRET=
+AUTH0_MGMT_CLIENT_ID=
+AUTH0_MGMT_SECRET=
+
+# Authentication strategy
+AUTH_STRATEGY=DUMMY
 ```
 
-## Attribution
-Please cite our [[conference paper]](https://aclanthology.org/2021.emnlp-demo.25/) if you find it useful in your research:
-```
-@inproceedings{bikaun2021lexiclean,
-  title={LexiClean: An annotation tool for rapid multi-task lexical normalisation},
-  author={Bikaun, Tyler and French, Tim and Hodkiewicz, Melinda and Stewart, Michael and Liu, Wei},
-  booktitle={Proceedings of the 2021 Conference on Empirical Methods in Natural Language Processing: System Demonstrations},
-  pages={212--219},
-  year={2021}
-}
+Refer to the [Deployment section](#deployment) for advanced environment variable configurations, including those supporting the Auth0 authentication strategy.
+
+#### Client
+
+Create a `.env` file in the root directory of `./client` and populate it with the required environment variables. For example:
+
+```makefile
+REACT_APP_AUTH_STRATEGY=DUMMY
+REACT_APP_API_URL=http://localhost:3001
+
+# Optional Auth0 configuration
+REACT_APP_AUTH0_DOMAIN=
+REACT_APP_AUTH0_CLIENT_ID=
+REACT_APP_AUTH0_AUDIENCE=
+
+REACT_APP_DOCS_URL=http://localhost:4000
+
 ```
 
-## Feedback
-Please email any feedback or questions to Tyler Bikaun (tyler.bikaun@research.uwa.edu.au)
+For advanced environment variables, including those supporting Auth0 authentication, see [Deployment](#deployment).
+
+### Running LexiClean
+
+With Docker and Docker Compose installed and the environment variables configured, you can now run LexiClean using the following command:
+
+```bash
+docker-compose up --build
+```
+
+This command builds the images for the application (if they are not already built) and starts the containers defined in your `docker-compose.yml` file. The `--build` option ensures that Docker builds the images before starting the containers, which is useful when you have made changes to your Dockerfile or application code.
+
+Once the containers are up and running, you can access the application as follows:
+
+- **Frontend:** Open your web browser and navigate to `http://localhost:3000`.
+- **Backend/API:** The backend API is accessible at `http://localhost:3001`.
+- **Documentation Site**: Open your web browser and navigate to `http://localhost:4000`.
+
+To stop the application and remove the containers, use the following command:
+
+```bash
+docker-compose down
+```
+
+For further details on Docker, including its commands, please refer to the [Docker documentation](https://docs.docker.com/).
+
+## Documentation
+
+Detailed documentation about LexiClean can be accessed at http://localhost:4000 when you have the application running, or by visiting [here](). LexiClean uses [Docasaurus]() as a static documentation site.
