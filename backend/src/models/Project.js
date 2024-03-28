@@ -15,6 +15,7 @@ const ProjectSchema = mongoose.Schema(
     description: {
       type: String,
       required: false,
+      default: "",
     },
     parallelCorpus: { type: Boolean, required: true },
     preprocessing: {

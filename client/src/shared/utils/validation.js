@@ -1,9 +1,8 @@
 const checkValid = (arr) => arr.every(Boolean);
 
-export const ValidateCreateDetails = (projectName, projectDescription) => {
+export const ValidateCreateDetails = (projectName) => {
   const validName = projectName !== "";
-  const validDescription = projectDescription !== "";
-  return checkValid([validName, validDescription]);
+  return checkValid([validName]);
 };
 
 export const ValidateCreateSchema = () => {

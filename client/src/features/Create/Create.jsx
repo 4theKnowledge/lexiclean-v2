@@ -136,10 +136,7 @@ const CreateProject = () => {
   };
 
   useEffect(() => {
-    const detailsValid = ValidateCreateDetails(
-      values["projectName"],
-      values["projectDescription"]
-    );
+    const detailsValid = ValidateCreateDetails(values["projectName"]);
     updateStepValidation("details", detailsValid);
 
     // ValidateCreateSchema (nothing to check)

@@ -18,8 +18,8 @@ const Details = ({ values, updateValue }) => {
           updateValue({ key: "projectDescription", value: targetValue })
         }
         title="Project Description"
-        caption="Describe your project to provide context for annotators. You can edit this description at any time."
-        placeholder="Enter a brief description"
+        caption="Optional: Describe your project to provide context for annotators. You can edit this description at any time."
+        placeholder="Enter a brief description (optional)"
       />
     </Stack>
   );
