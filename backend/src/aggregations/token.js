@@ -40,8 +40,7 @@ export const textTokenSearchPipeline = ({
                 ? {
                     $regexMatch: {
                       input: "$$token.value",
-                      regex: searchTerm,
-                      options: "i",
+                      regex: new RegExp(`\\b${searchTerm}\\b`, "i"),
                     },
                   }
                 : {},
