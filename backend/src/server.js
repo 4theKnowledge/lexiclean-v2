@@ -1,11 +1,10 @@
 import dotenv from "dotenv";
-dotenv.config({ path: "./.env" });
-
 import express from "express";
 import cors from "cors";
-import mongoose from "mongoose";
+// import mongoose from "mongoose";
 import { auth } from "express-oauth2-jwt-bearer";
 import { rateLimit } from "express-rate-limit";
+import logger from "./logger/index.js";
 
 import projectRoute from "./routes/project.js";
 import textRoute from "./routes/text.js";
@@ -14,10 +13,13 @@ import schemaRoute from "./routes/schema.js";
 import userRoute from "./routes/user.js";
 import notificationRoute from "./routes/notification.js";
 import { authenticateUser, projectAccessCheck } from "./middleware/auth.js";
+import { connectDB } from "./db.js";
+
+dotenv.config({ path: "./.env" });
 
 const app = express();
 
-console.log(`Running in ${process.env.AUTH_STRATEGY} mode`);
+logger.info(`Running in ${process.env.AUTH_STRATEGY} mode`);
 
 // Create rate limit rule
 const apiLimiter = rateLimit({
@@ -31,7 +33,8 @@ const apiLimiter = rateLimit({
 app.use(apiLimiter);
 
 // Simple health check
-app.get("/status", (req, res) => {
+app.get("/status", (_req, res) => {
+  logger.info("GET /status");
   res.status(200).send("OK");
 });
 
@@ -64,24 +67,18 @@ app.use("/api/user", userRoute);
 app.use("/api/notification", notificationRoute);
 
 // Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err);
+app.use((err, _req, res, _next) => {
+  logger.error(err);
   res.status(err.status || 500).send({
     error: err.message || "An unexpected error occurred",
   });
 });
 
 // Connect to mongo db
-const DB_URI = process.env.DB_URI;
-console.log(`DB_URI: ${DB_URI}`);
-
-mongoose
-  .connect(DB_URI, { useNewUrlParser: true, useUnifiedTopology: true })
-  .then(() => console.log("[server] Connected to db"))
-  .catch((err) => console.error(err));
+connectDB();
 
 // Create listener
 const port = process.env.PORT || 3001;
-app.listen(port, () => console.log(`[server] Started on port ${port}`));
+app.listen(port, () => logger.info(`[server] Started on port ${port}`));
 
 export default app;
