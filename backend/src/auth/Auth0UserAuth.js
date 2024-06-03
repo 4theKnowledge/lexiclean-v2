@@ -3,24 +3,27 @@ import IUserAuth from "./IUserAuth.js";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
 import User from "../models/User.js";
+import logger from "../logger/index.js";
 
 export class Auth0UserAuth extends IUserAuth {
   async validateAndCreateUser(authHeader) {
     const token = authHeader.replace("Bearer ", "");
     const userDecoded = jwtDecode(token);
-    let user = await User.findOne({ authId: userDecoded.sub }).lean();
 
-    if (!user) {
-      const auth0MgmtToken = await this.getAuth0ManagementToken();
-      const { data: auth0UserDetails } = await axios.get(
-        `https://${process.env.AUTH0_DOMAIN}/api/v2/users/${userDecoded.sub}`,
-        {
-          headers: { authorization: `Bearer ${auth0MgmtToken}` },
-        }
-      );
+    try {
+      let user = await User.findOne({ authId: userDecoded.sub }).lean();
+      if (!user) {
+        const auth0MgmtToken = await this.getAuth0ManagementToken();
+        const { data: auth0UserDetails } = await axios.get(
+          `https://${process.env.AUTH0_DOMAIN}/api/v2/users/${userDecoded.sub}`,
+          {
+            headers: { authorization: `Bearer ${auth0MgmtToken}` },
+          }
+        );
 
-      console.log("creating new user in db");
-      try {
+        logger.info(
+          `Creating new user: ${auth0UserDetails.username.toLowerCase()}`
+        );
         const newUser = new User({
           username: auth0UserDetails.username
             ? auth0UserDetails.username.toLowerCase()
@@ -32,12 +35,15 @@ export class Auth0UserAuth extends IUserAuth {
 
         const savedUser = await newUser.save();
         user = savedUser;
-      } catch (error) {
-        console.log(error);
+      } else {
+        logger.info("Existing user found.");
       }
-    }
 
-    return user._id;
+      return { success: true, userId: user._id };
+    } catch (error) {
+      logger.error(`Failed to find/create user: ${error.message}`);
+      return { success: false, error: error.message };
+    }
   }
 
   async getAuth0ManagementToken() {

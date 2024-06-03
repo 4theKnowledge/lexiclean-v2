@@ -1,19 +1,25 @@
 import Project from "../models/Project.js";
 import { getAuthStrategy } from "../auth/userAuthStrategyConfig.js";
+import logger from "../logger/index.js";
 
 export const authenticateUser = async (req, res, next) => {
   try {
+    logger.info("headers: ", req.headers);
     const authStrategy = getAuthStrategy();
-    const userId = await authStrategy.validateAndCreateUser(
+    const response = await authStrategy.validateAndCreateUser(
       req.headers.authorization
     );
+    const userId = response.userId;
+    logger.info("Authenticating user: ", userId);
 
     if (!userId) {
+      logger.error("Unauthorized: User not found.");
       return res.status(401).json({ message: "Unauthorized: User not found." });
     }
     req.userId = userId; // Attach userId to request for subsequent handlers
     next(); // Proceed to the next middleware/route handler
   } catch (error) {
+    logger.error("Error authenticating user:", error);
     return res.status(500).json({ message: "Failed to authenticate user." });
   }
 };
@@ -48,7 +54,7 @@ export const projectAccessCheck = async (req, res, next) => {
 
     next(); // User has access, proceed to the next middleware/route handler
   } catch (error) {
-    console.error("Error checking project access:", error);
+    logger.error("Error checking project access:", error);
     return res.status(500).json({ message: "Failed to check project access." });
   }
 };
@@ -80,7 +86,7 @@ export const projectManagementCheck = async (req, res, next) => {
 
     next(); // User has access, proceed to the next middleware/route handler
   } catch (error) {
-    console.error("Error checking project access:", error);
+    logger.error("Error checking project access:", error);
     return res.status(500).json({ message: "Failed to check project access." });
   }
 };
