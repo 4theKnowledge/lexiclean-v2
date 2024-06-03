@@ -4,4 +4,7 @@ export default {
   },
   testEnvironment: "node",
   globalTeardown: "./tests/teardown.js",
+  collectCoverage: true,
+  coverageDirectory: "coverage",
+  coverageReporters: ["text", "lcov"],
 };
