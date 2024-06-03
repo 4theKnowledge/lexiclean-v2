@@ -1,5 +1,5 @@
 import request from "supertest";
-import app from "../src/server";
+import app from "../src/server.js";
 
 describe("GET /status", () => {
   it('should respond with "OK"', async () => {

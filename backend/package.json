@@ -5,13 +5,9 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "nodemon ./src/server.js",
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
     "test": "jest"
-  },
-  "babel": {
-    "presets": [
-      "@babel/preset-env"
-    ]
   },
   "author": "Tyler Bikaun",
   "license": "ISC",
@@ -27,7 +23,6 @@
     "express-rate-limit": "^7.2.0",
     "jwt-decode": "^4.0.0",
     "mongoose": "^6.5.2",
-    "nodemon": "^2.0.19",
     "winston": "^3.8.1"
   },
   "nodemonConfig": {
@@ -36,12 +31,32 @@
     ]
   },
   "devDependencies": {
+    "@babel/cli": "^7.24.6",
     "@babel/core": "^7.24.6",
     "@babel/node": "^7.18.10",
+    "@babel/plugin-transform-runtime": "^7.24.6",
     "@babel/preset-env": "^7.24.6",
     "@babel/register": "^7.24.6",
+    "babel-jest": "^29.7.0",
     "jest": "^29.7.0",
     "mongodb-memory-server": "^9.3.0",
+    "nodemon": "^3.1.2",
     "supertest": "^6.3.4"
+  },
+  "babel": {
+    "presets": [
+      [
+        "@babel/preset-env",
+        {
+          "targets": {
+            "node": "current"
+          },
+          "modules": "auto"
+        }
+      ]
+    ],
+    "plugins": [
+      "@babel/plugin-transform-runtime"
+    ]
   }
 }
