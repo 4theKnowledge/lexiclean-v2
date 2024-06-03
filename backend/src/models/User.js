@@ -1,5 +1,9 @@
+// User.js
 import mongoose from "mongoose";
 
+/**
+ * User Schema
+ */
 const UserSchema = new mongoose.Schema(
   {
     username: {
@@ -47,6 +51,11 @@ const UserSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+    },
+    auth_strategy: {
+      type: String,
+      required: true,
+      default: () => process.env.AUTH_STRATEGY.toLowerCase(),
     },
   },
   { _id: true, collection: "users" }
