@@ -8,7 +8,7 @@ module.exports = {
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
-  globalTeardown: "./tests/teardown.js",
+  globalTeardown: "./tests/utils/teardown.js",
   // Coverage configuration
   collectCoverage: true,
   coverageDirectory: "coverage",

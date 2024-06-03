@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 import { MongoMemoryServer } from "mongodb-memory-server";
-import { connectDB, disconnectDB } from "../src/db.js";
+import { connectDB, disconnectDB } from "../../src/db.js";
 
 jest.setTimeout(30000); // Set timeout to 30 seconds
 
