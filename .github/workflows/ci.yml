@@ -32,3 +32,11 @@ jobs:
       - name: Test backend
         working-directory: ./backend
         run: npm test
+
+      - name: Install client dependencies
+        working-directory: ./client
+        run: npm install
+
+      - name: Test client
+        working-directory: ./client
+        run: npm test
