@@ -23,3 +23,15 @@ export const setupAuthMock = (isAuthenticated = false) => {
     logout: jest.fn(),
   }));
 };
+
+// Setup navigate mock before the jest.mock call
+const mockNavigate = jest.fn();
+jest.mock("react-router-dom", () => ({
+  ...jest.requireActual("react-router-dom"), // keep other exports of react-router-dom
+  useNavigate: () => mockNavigate, // return the mock function directly
+}));
+
+export const setupNavigateMock = () => {
+  mockNavigate.mockReset(); // reset any previous mock usage
+  return mockNavigate; // return the mock for further assertions in tests
+};

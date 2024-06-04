@@ -10,7 +10,13 @@ const BrandToolbar = () => {
   };
 
   return (
-    <Stack direction="row" alignItems="center" spacing={1} ml={1}>
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={1}
+      ml={1}
+      data-testid="brand-toolbar"
+    >
       <Stack
         direction="row"
         alignItems="center"
