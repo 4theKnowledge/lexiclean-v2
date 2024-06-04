@@ -22,7 +22,7 @@ import { useContext, useState } from "react";
 import { ThemeContext } from "../../shared/context/ThemeContext";
 import BrandToolbar from "../../shared/components/Layout/BrandToolbar";
 
-const features = [
+export const featureContent = [
   {
     title: "Elevate & Protect Your Data",
     content:
@@ -48,6 +48,7 @@ const features = [
 const Landing = () => {
   return (
     <Box
+      data-testid="landing"
       sx={{
         display: "flex",
         flexDirection: "column",
@@ -64,12 +65,13 @@ const Landing = () => {
   );
 };
 
-const ActionButton = ({ size = "medium" }) => {
+export const ActionButton = ({ size = "medium" }) => {
   const useAuthStrategy = getAuthServiceStrategy();
   const { isAuthenticated, login } = useAuthStrategy();
 
   return isAuthenticated ? (
     <Button
+      data-testid="action-button-authenticated"
       variant="contained"
       component={Link}
       to="/projects"
@@ -80,18 +82,25 @@ const ActionButton = ({ size = "medium" }) => {
       Enter
     </Button>
   ) : (
-    <Button variant="contained" size={size} disableElevation onClick={login}>
+    <Button
+      variant="contained"
+      size={size}
+      disableElevation
+      onClick={login}
+      data-testid="action-button-unauthenticated"
+    >
       Get Started
     </Button>
   );
 };
 
-const Header = () => {
+export const Header = () => {
   const useAuthStrategy = getAuthServiceStrategy();
   const { isAuthenticated, login, logout } = useAuthStrategy();
   const theme = useTheme();
   return (
     <Box
+      data-testid="header"
       display="flex"
       p="1rem 0rem"
       justifyContent="space-between"
@@ -103,16 +112,20 @@ const Header = () => {
         backgroundColor: alpha(theme.palette.background.light, 0.95),
       }}
     >
-      {/* Brand */}
       <BrandToolbar />
-      {/* Actions */}
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        id="header-actions"
+      >
         {/* <Button size="small">Documentation</Button> */}
         <IconButton color="inherit">
           <GitHubIcon />
         </IconButton>
         <ThemeToggleButton />
         <Button
+          id="header-login-button"
           size="small"
           onClick={
             isAuthenticated
@@ -128,13 +141,14 @@ const Header = () => {
   );
 };
 
-const MainContent = () => {
+export const MainContent = () => {
   const { mode } = useContext(ThemeContext);
   const [imageLoaded, setImageLoaded] = useState(false);
   const matches = useMediaQuery((theme) => theme.breakpoints.down("md"));
 
   return (
     <Box
+      id="main"
       display="flex"
       justifyContent="center"
       alignItems="center"
@@ -220,16 +234,18 @@ const MainContent = () => {
           spacing={4}
           sx={{ display: "flex", alignItems: "stretch" }}
         >
-          <Features />
+          <Features features={featureContent} />
         </Grid>
       </Grid>
     </Box>
   );
 };
 
-const Features = () => {
+export const Features = ({ features }) => {
   return features.map((feature, index) => (
     <Grid
+      id={`main-feature-${index}`}
+      data-testid={`main-feature-${index}`}
       item
       xs={12}
       lg={3}
@@ -258,10 +274,11 @@ const Features = () => {
   ));
 };
 
-const Footer = () => {
+export const Footer = () => {
   return (
     <Box
       component="footer"
+      data-testid="footer"
       sx={{
         py: 2,
         px: 2,
@@ -273,6 +290,7 @@ const Footer = () => {
       <Container maxWidth="lg">
         <Typography variant="body1">
           <MuiLink
+            id="footer-privacy-policy"
             href={`${process.env.REACT_APP_DOCS_URL}/privacy-policy`}
             color="primary"
             underline="hover"
@@ -283,6 +301,7 @@ const Footer = () => {
           </MuiLink>
           {" | "}
           <MuiLink
+            id="footer-terms-and-conditions"
             href={`${process.env.REACT_APP_DOCS_URL}/terms-and-conditions`}
             color="primary"
             underline="hover"
@@ -298,6 +317,7 @@ const Footer = () => {
             🚀
           </span>{" "}
           <MuiLink
+            id="footer-github-link"
             href="https://github.com/4theKnowledge"
             color="primary"
             underline="hover"
