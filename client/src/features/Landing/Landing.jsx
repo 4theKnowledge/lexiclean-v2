@@ -148,7 +148,7 @@ export const MainContent = () => {
 
   return (
     <Box
-      id="main"
+      data-testid="main-content"
       display="flex"
       justifyContent="center"
       alignItems="center"
@@ -158,18 +158,31 @@ export const MainContent = () => {
         overflow: "auto",
       }}
     >
-      <Grid container spacing={2} alignItems="center">
-        <Grid container item xs={12} spacing={4} direction="row">
-          <Grid item lg={4} md={12} xs={12}>
+      <Grid container spacing={2} alignItems="center" data-testid="main-grid">
+        <Grid
+          container
+          item
+          xs={12}
+          spacing={4}
+          direction="row"
+          data-testid="content-row"
+        >
+          <Grid item lg={4} md={12} xs={12} data-testid="left-column">
             <Stack
               direction="column"
               spacing={4}
               sx={{ textAlign: { xs: "center", md: "center", lg: "left" } }}
+              data-testid="text-stack"
             >
-              <Typography variant="h3" gutterBottom>
+              <Typography variant="h3" gutterBottom data-testid="main-heading">
                 Unlock the Full Potential of Your NLP Data!
               </Typography>
-              <Typography fontSize={16} gutterBottom color="text.secondary">
+              <Typography
+                fontSize={16}
+                gutterBottom
+                color="text.secondary"
+                data-testid="main-subtext"
+              >
                 Are dirty texts jamming your NLP pipelines? Concerned about
                 sensitive information lurking in your data? Say no more!
                 LexiClean is here to support your lexical normalisation and
@@ -181,6 +194,7 @@ export const MainContent = () => {
                 alignItems="center"
                 justifyContent="center"
                 gap={2}
+                data-testid="action-buttons"
               >
                 <ActionButton />
                 <Button
@@ -190,14 +204,19 @@ export const MainContent = () => {
                   sx={{ textDecoration: "none" }}
                   target="_blank"
                   rel="noreferrer"
+                  data-testid="find-out-more-button"
                 >
                   Find Out More
                 </Button>
               </Box>
             </Stack>
           </Grid>
-          <Grid item lg={8} md={12} xs={12}>
-            <Paper sx={{ borderRadius: 2 }} elevation={4}>
+          <Grid item lg={8} md={12} xs={12} data-testid="right-column">
+            <Paper
+              sx={{ borderRadius: 2 }}
+              elevation={4}
+              data-testid="image-paper"
+            >
               {!matches && (
                 <>
                   {!imageLoaded && (
@@ -205,6 +224,7 @@ export const MainContent = () => {
                       variant="rectangular"
                       width="100%"
                       sx={{ paddingTop: "56.25%" }} // Aspect ratio of 16:9
+                      data-testid="image-skeleton"
                     />
                   )}
                   <Box
@@ -219,6 +239,7 @@ export const MainContent = () => {
                     src={`${process.env.PUBLIC_URL}/static/annotation_interface_${mode}.png`}
                     alt="Annotation Interface"
                     onLoad={() => setImageLoaded(true)}
+                    data-testid="main-image"
                   />
                 </>
               )}
@@ -233,6 +254,7 @@ export const MainContent = () => {
           mt={4}
           spacing={4}
           sx={{ display: "flex", alignItems: "stretch" }}
+          data-testid="features-grid"
         >
           <Features features={featureContent} />
         </Grid>
@@ -265,10 +287,20 @@ export const Features = ({ features }) => {
         }}
         variant="outlined"
       >
-        <Typography variant="h6" component="h3" gutterBottom>
+        <Typography
+          variant="h6"
+          component="h3"
+          gutterBottom
+          data-testid={`main-feature-${index}-title`}
+        >
           {feature.title}
         </Typography>
-        <Typography variant="body2">{feature.content}</Typography>
+        <Typography
+          variant="body2"
+          data-testid={`main-feature-${index}-content`}
+        >
+          {feature.content}
+        </Typography>
       </Paper>
     </Grid>
   ));
@@ -290,7 +322,7 @@ export const Footer = () => {
       <Container maxWidth="lg">
         <Typography variant="body1">
           <MuiLink
-            id="footer-privacy-policy"
+            data-testid="footer-privacy-policy"
             href={`${process.env.REACT_APP_DOCS_URL}/privacy-policy`}
             color="primary"
             underline="hover"
@@ -301,7 +333,7 @@ export const Footer = () => {
           </MuiLink>
           {" | "}
           <MuiLink
-            id="footer-terms-and-conditions"
+            data-testid="footer-terms-and-conditions"
             href={`${process.env.REACT_APP_DOCS_URL}/terms-and-conditions`}
             color="primary"
             underline="hover"
@@ -317,7 +349,7 @@ export const Footer = () => {
             🚀
           </span>{" "}
           <MuiLink
-            id="footer-github-link"
+            data-testid="footer-github-link"
             href="https://github.com/4theKnowledge"
             color="primary"
             underline="hover"
