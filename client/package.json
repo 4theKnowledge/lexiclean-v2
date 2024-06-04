@@ -11,7 +11,7 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
-  "author": "",
+  "author": "Tyler Bikaun",
   "license": "ISC",
   "eslintConfig": {
     "extends": [
@@ -54,6 +54,10 @@
     "web-vitals": "^3.5.2"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.1.0",
+    "@testing-library/jest-dom": "^6.4.5",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.5.2",
     "concurrently": "^8.2.2",
     "eslint-config-react-app": "^7.0.1"
   }
